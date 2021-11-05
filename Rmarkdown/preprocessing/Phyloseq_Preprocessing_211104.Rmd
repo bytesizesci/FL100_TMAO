@@ -16,7 +16,8 @@ output: html_document
 **Outputs:** Outputs include: 
 
 1) Processed QIIME2 inputs in R .rds and .csv formats
-2) Phyloseq object with XXX phenotypes
+2) Phyloseq object with log transformed Biocrates BD1 data [PSOlogBioc]
+3) Phyloseq object with TMAO releated phenotypes [PSOtmao]
 
 
 
@@ -96,6 +97,55 @@ write.csv(taxTbl, "../../data/processed/microbiome/phyloseq_inputs/merged-taxono
 saveRDS(taxTbl, "../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.rds")
 ```
 
+Alpha diversity statistics 
+
+```{r Load Diversity .qza files}
+md <- readRDS("../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.rds")
+rownames(md) <- md[,"Description"]
+
+# Faith PD
+FaithPD <- read_qza(file = "../../data/raw/from_MaryKable/core-metrics-results-dada2-tmao/faith_pd_vector.qza", tmp = "Q2RTemp", rm = F)
+FaithPD_DF <- FaithPD$data #353, not 355... 
+
+# Shannon
+shannon <- read_qza(file = "../../data/raw/from_MaryKable/core-metrics-results-dada2-tmao/shannon_vector.qza", tmp = "Q2RTemp", rm = F)
+shannon_DF <- shannon$data #353, not 355... 
+
+# Observed ASV
+Observed <- read_qza(file = "../../data/raw/from_MaryKable/core-metrics-results-dada2-tmao/observed_otus_vector.qza", tmp = "Q2RTemp", rm = F)
+Observed_DF <- Observed$data #353, not 355... 
+
+# Evenness ASV
+evenness <- read_qza(file = "../../data/raw/from_MaryKable/core-metrics-results-dada2-tmao/evenness_vector.qza", tmp = "Q2RTemp", rm = F)
+evenness_DF <- evenness$data #353, not 355... 
+
+# Merge all of the alpha diversity measures by row names (or a common column name)
+l = list(FaithPD_DF, shannon_DF, Observed_DF, evenness_DF)
+# Make into one DF
+Q2_alpha_DF <- Reduce(merge, lapply(l, function(x) data.frame(x, rn = row.names(x))))
+
+# Now modify (and save downstream)
+Q2_alpha_DF$rn <- gsub("[r,x]$","",Q2_alpha_DF$rn)
+Q2_alpha_DF$rn <- gsub("\\-.*$","",Q2_alpha_DF$rn)
+
+# Merge with MetaData
+metadata2 <- merge(md, Q2_alpha_DF,
+                   by.x = 0,
+                   by.y = "rn",
+                   all.x = TRUE)
+
+rownames(metadata2) <- metadata2[,"Row.names"]
+metadata2 <- subset(metadata2, select =-c(Row.names))
+
+# comment out the all.x line in the merge command and run this code; this shows you that 6072 and 7063 don't have alpha stats.
+#md2[!(rownames(md2) %in% metadata2$Row.names),] # 6072 and 7063 get left out... no alpha stats for them
+
+# Save
+write.csv(metadata2, file = "../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min_withAlphaStatistics_211104.csv")
+saveRDS(metadata2, file = "../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min_withAlphaStatistics_211104.rds")
+
+```
+
 # Phyloseq Objects 
 
 We want to make a phyloseq object for each type of data we are interested in. I find this easier than making one master phyloseq object since sometimes the commands don't handle NAs well. We will make new categorical columns based on the cohort's median value of a given metabolite. Once that is complete, we can create the phyloseq object and save for future use. 
@@ -106,7 +156,7 @@ Make a phyloseq object for the log transformed biocrates BD1 data. First, we hav
 
 ```{r Biocrates BD1 log transformed phyloseq preprocess}
 # Load Mary's original memtadata file... that we converted into a csv in the above chunk. 
-md <- readRDS("../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.rds")
+md <- readRDS("../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min_withAlphaStatistics_211104.rds")
 rownames(md) <- md[,"Description"]
 
 # Load phenotype data HERE 
@@ -193,14 +243,14 @@ PSOlogBioc <- phyloseq(
 print(PSOlogBioc)
 
 # Save the phyloseq object
-save(PSOlogBioc, file = "../../data/processed/microbiome/phyloseq_objects/PSOlogBioc_211104.RData")
+save(PSOlogBioc, file = "../../data/processed/microbiome/phyloseq_objects/PSOlogBioc_211105.RData")
 ```
 
 ## TMAO Phyloseq Object
 
 ```{r Biocrates BD1 log transformed phyloseq preprocess}
 # Load Mary's original memtadata file... that we converted into a csv in the above chunk. 
-md <- readRDS("../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.rds")
+md <- readRDS("../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min_withAlphaStatistics_211104.rds")
 rownames(md) <- md[,"Description"]
 
 # Load phenotype data HERE 
