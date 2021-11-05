@@ -271,6 +271,9 @@ div.tocify {
 bio &lt;- read.csv(&quot;../../data/raw/from_JohnNewman/Prelim_Biocretes_dataset_v3_corrected_PPTime.csv&quot;, na.strings=c(&quot;&quot;,&quot; &quot;,&quot;NA&quot;))
 
 bio[1:10,1:10]</code></pre>
+</div>
+<div id="preprocess" class="section level1">
+<h1>Preprocess</h1>
 <p>This file is ugly. It needs to be tailored before we can confidently maneuver in it.</p>
 <pre class="r"><code># Set column names
 colnames(bio) &lt;- bio[3,]
@@ -375,6 +378,9 @@ bd.complete.w &lt;- bd.all.w[complete.cases(bd.all.w$TMAO.0)==TRUE &amp;
 # Save
 write.csv(bd.complete.w, &quot;../../data/processed/biocrates/FL100_biocrates_rawCounts_BD1-4CompleteCases_211103.csv&quot;)
 saveRDS(bd.complete.w, &quot;../../data/processed/biocrates/FL100_biocrates_rawCounts_BD1-4CompleteCases_211103.rds&quot;)</code></pre>
+</div>
+<div id="transform" class="section level1">
+<h1>Transform</h1>
 <p>Recall, this data has gone through general QC by the Newman lab but it has not been assessed for compliance to the normal distribution. Next, we will complete log transformations and save output.</p>
 <pre class="r"><code># Check data
 bio_bd1[1:10,1:10] #C0 starts in column 3</code></pre>

@@ -1,0 +1,297 @@
+---
+title: "Phyloseq Preprocessing"
+author: "Kristen James"
+date: "11/2/2021"
+output: html_document
+---
+
+# About
+
+**Project:** FL100
+
+**About:** Make Phyloseq objects with the phenotype data and the inputs from Dr. Mary Kable. 
+
+**Inputs:** QIIME2 outputs from Dr. Mary Kable
+
+**Outputs:** Outputs include: 
+
+1) Processed QIIME2 inputs in R .rds and .csv formats
+2) Phyloseq object with XXX phenotypes
+
+
+
+# Set Up
+
+Load libraries. 
+
+```{r libraries, warning=FALSE}
+# Load libraries
+library(phyloseq)
+library(qiime2R)
+library(tibble)
+```
+
+Load raw data from Dr. Mary Kable.
+
+```{r Original Data from Mary}
+## Metadata
+# Metadata file from Mary Kable
+metadata <- read.delim("../../data/raw/from_MaryKable/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.txt", stringsAsFactors = F)
+
+# For qza files, make a temporary directory
+dir.create("../../data/raw/from_MaryKable/Q2Rtemp")
+
+## OTU Table
+# Load the OTU count table 
+countTbl <- read_qza(file = "../../data/raw/from_MaryKable/merged-table-dada2_no-mito-chloro_0.2rm_TMAOsamps_mc1.qza", tmp = "../../data/raw/from_MaryKable/Q2Rtemp", rm = F)
+names(countTbl) # look at names of the list components
+countTbl$uuid # unique identifier of the artifact
+countTbl$data[1:4,1:4] # the raw data (OTU table), look at a subset
+dim(countTbl$data)
+# Save the 'data' portion 
+countData <- countTbl$data
+colnames(countData)
+# Note, many subject IDs have odd characters after their ID number. For example, "-X", "r", "-Z" etc. 
+# These represent sample duplicates, repeats, etc. The metadata mapping file links the sampleID (XXXXr or XXXX-F10) and the subjectID (XXXX). To simplify downstream analysis, lets use the subject ID. (Can always revert if needed downstream).
+
+# Create a copy to save in next chunk
+countData_originalMK <- countData
+
+# Now modify (and save downstream)
+colnames(countData) <- gsub("[r,x]$","",colnames(countData))
+colnames(countData) <- gsub("\\-.*$","",colnames(countData))
+colnames(countData) # check that column names are only subjectID now; good. 
+
+## Taxonomy Table
+# Load the taxonomy table
+taxonTbl <- read_qza(file = "../../data/raw/from_MaryKable/merged-taxonomy-dada2-retrained.qza", tmp = "../../data/raw/from_MaryKable/Q2Rtemp", rm = F)
+names(taxonTbl)
+taxonTbl$uuid
+head(taxonTbl$data) # this reveals that the taxonomy table has classifications to species level (in few cases) (click the right arrow to see). 
+# Make taxonomy table human readable
+taxTbl<-taxonTbl$data %>% as_tibble() %>% tidyr::separate(Taxon, sep=";", c("Kingdom","Phylum","Class","Order","Family","Genus","Species"))
+# View
+taxTbl
+```
+
+Save
+
+```{r Save QIIME2 files as csv and rds}
+# First, save the count table (with sampleID names) - we won't plan to use this but good to have a copy
+write.csv(countData_originalMK, "../../data/processed/microbiome/phyloseq_inputs/merged_table_dada2_no_mito_chloro_highseqreps_0.2rm.csv")
+saveRDS(countData_originalMK, "../../data/processed/microbiome/phyloseq_inputs/merged_table_dada2_no_mito_chloro_highseqreps_0.2rm.rds")
+
+# Save 3 items, which we will use:
+
+# Save the metadata .txt as a csv so that it can be easily altered. 
+write.csv(metadata, "../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.csv")
+saveRDS(metadata, "../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.rds")
+
+# Save the count table (with subjectID names)
+write.csv(countData, "../../data/processed/microbiome/phyloseq_inputs/merged_table_dada2_no_mito_chloro_highseqreps_0.2rm_subjectID.csv")
+saveRDS(countData, "../../data/processed/microbiome/phyloseq_inputs/merged_table_dada2_no_mito_chloro_highseqreps_0.2rm_subjectID.rds")
+
+# Save the human readable taxonomy table
+write.csv(taxTbl, "../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.csv")
+saveRDS(taxTbl, "../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.rds")
+```
+
+# Phyloseq Objects 
+
+We want to make a phyloseq object for each type of data we are interested in. I find this easier than making one master phyloseq object since sometimes the commands don't handle NAs well. We will make new categorical columns based on the cohort's median value of a given metabolite. Once that is complete, we can create the phyloseq object and save for future use. 
+
+## Biocrates Phyloseq Object
+
+Make a phyloseq object for the log transformed biocrates BD1 data. First, we have to do additional preprocessing.
+
+```{r Biocrates BD1 log transformed phyloseq preprocess}
+# Load Mary's original memtadata file... that we converted into a csv in the above chunk. 
+md <- readRDS("../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.rds")
+rownames(md) <- md[,"Description"]
+
+# Load phenotype data HERE 
+df <- readRDS("../../data/processed/biocrates/FL100_biocrates_lnTransformed_BD1_211103.rds")
+colnames(df[,1:10])
+
+# Trim df to subjects WITH TMAO (primary variable)
+#df <- df[which(complete.cases(df$p.Cresol.SO4.0) == TRUE),]
+
+# First, check the structure of the data. Make sure everything is numeric/integer. 
+str(df[,1:15])
+
+# In the event that some variables are factors, run the following code. (Can run regardless, if the original is already numeric the output will be identical)
+# In order to make them numeric we first have to turn them to characters. 
+df1 <- df # save a copy
+# This loops says, "if you are a factor, then first become a character, then a number; if you aren't a factor, stay how you are"
+df1[] <- lapply(df1, function(x) {
+    if(is.factor(x)) as.numeric(as.character(x)) else x
+})
+
+# Make categorical variables
+input_data <- df1
+out <- list()
+for(i in seq_along(input_data)){
+  mdn <- lapply(input_data, 2, FUN = median) # find the median for each column
+  out[[i]] <- ifelse(input_data[,i] <= mdn[i], 0, 1) # assign 0 if value is less than or equal to median
+}
+res <- do.call("cbind",out)
+colnames(res) <- paste0(colnames(input_data), "_mdn")
+rownames(res) <- rownames(input_data)
+
+# Turn to a dataframe and rename. Then turn variables into factors as they should be.
+str(res[,1:15])
+df2 <- as.data.frame(res)
+str(df2[,1:15])
+# Factor
+df3 <- df2 # back up
+df3[] <- lapply(df3, function(x) {
+    if(is.numeric(x)) as.factor(x) else x
+})
+str(df3[,1:15])
+# Visually check that df2 and df3 appear the same; pass check
+
+# Merge categorical data with numeric data
+df4 <- merge(df, df3, by = 0)
+rownames(df4) <- df4[,1]
+df4 <- df4[,-1]
+
+# Merge with metadata file
+md2 <- merge(md, df4, by.x = "Description", by.y = 0) # Description = subjectID in the md object
+# 103 subjects. These are subjects with biocrates AND microbiome data. 
+
+# Assign 'Description' (subject ID in XXXX terms) to row names
+rownames(md2) <- md2$Description
+```
+
+### Save sample data
+
+```{r Save ln biocrates data}
+write.csv(md2, "../../data/processed/microbiome/phyloseq_inputs/lnBiocrates_mdn_sampledata_211105.csv")
+saveRDS(md2, "../../data/processed/microbiome/phyloseq_inputs/lnBiocrates_mdn_sampledata_211105.rds")
+```
+
+### Make Phyloseq object - log biocrates BD1
+
+```{r Make Phyloseq object- log biocrates BD1}
+# Load files (metadata, count table, taxonomy table, tree)
+# Metadata
+metadata_a <- readRDS("../../data/processed/microbiome/phyloseq_inputs/lnBiocrates_mdn_sampledata_211105.rds")
+# Count table
+ASVr <- readRDS("../../data/processed/microbiome/phyloseq_inputs/merged_table_dada2_no_mito_chloro_highseqreps_0.2rm_subjectID.rds")
+# Taxonomy table
+taxtable <- readRDS("../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.rds")
+# Phylogenetic Tree, rooted
+treeR <- read_qza(file = "../../data/raw/from_MaryKable/tmao-tree-files/rooted-tree-dada2_no-mito-chloro_0.2rm_TMAOsamps_mc1.qza",  tmp = "Q2Rtemp", rm = F)
+
+# Create phyloseq object
+PSOlogBioc <- phyloseq(
+  otu_table(ASVr, taxa_are_rows = T), 
+  phy_tree(treeR$data), 
+  tax_table(as.data.frame(taxtable) %>% dplyr::select(-Confidence) %>% column_to_rownames("Feature.ID") %>% as.matrix()), #moving the taxonomy to the way phyloseq wants it
+  sample_data(metadata_a)
+)
+print(PSOlogBioc)
+
+# Save the phyloseq object
+save(PSOlogBioc, file = "../../data/processed/microbiome/phyloseq_objects/PSOlogBioc_211104.RData")
+```
+
+## TMAO Phyloseq Object
+
+```{r Biocrates BD1 log transformed phyloseq preprocess}
+# Load Mary's original memtadata file... that we converted into a csv in the above chunk. 
+md <- readRDS("../../data/processed/microbiome/phyloseq_inputs/FL100_mapping_file_complete_highest-seq-reps_nocontrols_min.rds")
+rownames(md) <- md[,"Description"]
+
+# Load phenotype data HERE 
+df <- read.csv("../../data/raw/from_RedCAP/TMAO/CTSC24532USDAWHNRCNu-TMAOKJ012220_DATA_2020-07-15_0915_NAedited.csv", row.names = 1)
+colnames(df[,1:10])
+
+# Trim df to subjects WITH TMAO (primary variable)
+df <- df[which(complete.cases(df$tmao) == TRUE),]
+
+# Take a subset
+df <- subset(df, select = c( pa_ee_total, endo_ln_rhi, endo_al75, betaine, carnitine, tmao, choline, creatinine, phosphocholine, hei_asa24_totalveg, hei_asa24_totalproteinfoods, hei_asa24_sodium, hei_asa24_refinedgrains, hei_asa24_sfat, hei_asa24_addsug, hei_asa24_wholegrain, hei_asa24_totalscore ))
+
+# Transform
+df$tmao_log <- log(df$tmao)
+
+# First, check the structure of the data. Make sure everything is numeric/integer. 
+str(df[,1:15])
+
+# In the event that some variables are factors, run the following code. (Can run regardless, if the original is already numeric the output will be identical)
+# In order to make them numeric we first have to turn them to characters. 
+df1 <- df # save a copy
+# This loops says, "if you are a factor, then first become a character, then a number; if you aren't a factor, stay how you are"
+df1[] <- lapply(df1, function(x) {
+    if(is.factor(x)) as.numeric(as.character(x)) else x
+})
+
+# Make categorical variables
+input_data <- df1
+out <- list()
+for(i in seq_along(input_data)){
+  mdn <- lapply(input_data, 2, FUN = median) # find the median for each column
+  out[[i]] <- ifelse(input_data[,i] <= mdn[i], 0, 1) # assign 0 if value is less than or equal to median
+}
+res <- do.call("cbind",out)
+colnames(res) <- paste0(colnames(input_data), "_mdn")
+rownames(res) <- rownames(input_data)
+
+# Turn to a dataframe and rename. Then turn variables into factors as they should be.
+str(res[,1:15])
+df2 <- as.data.frame(res)
+str(df2[,1:15])
+# Factor
+df3 <- df2 # back up
+df3[] <- lapply(df3, function(x) {
+    if(is.numeric(x)) as.factor(x) else x
+})
+str(df3[,1:15])
+# Visually check that df2 and df3 appear the same; pass check
+
+# Merge categorical data with numeric data
+df4 <- merge(df, df3, by = 0)
+rownames(df4) <- df4[,1]
+df4 <- df4[,-1]
+
+# Merge with metadata file
+md2 <- merge(md, df4, by.x = "Description", by.y = 0) # Description = subjectID in the md object
+# 103 subjects. These are subjects with biocrates AND microbiome data. 
+
+# Assign 'Description' (subject ID in XXXX terms) to row names
+rownames(md2) <- md2$Description
+```
+
+### Save sample data
+
+```{r Save ln biocrates data}
+write.csv(md2, "../../data/processed/microbiome/phyloseq_inputs/TMAO_specificVariables_mdn_sampledata_211105.csv")
+saveRDS(md2, "../../data/processed/microbiome/phyloseq_inputs/TMAO_specificVariables_mdn_sampledata_211105.rds")
+```
+
+### Make Phyloseq object - specific TMAO variables
+
+```{r Make Phyloseq object- specific TMAO variables}
+# Load files (metadata, count table, taxonomy table, tree)
+# Metadata
+metadata_a <- readRDS("../../data/processed/microbiome/phyloseq_inputs/TMAO_specificVariables_mdn_sampledata_211105.rds")
+# Count table
+ASVr <- readRDS("../../data/processed/microbiome/phyloseq_inputs/merged_table_dada2_no_mito_chloro_highseqreps_0.2rm_subjectID.rds")
+# Taxonomy table
+taxtable <- readRDS("../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.rds")
+# Phylogenetic Tree, rooted
+treeR <- read_qza(file = "../../data/raw/from_MaryKable/tmao-tree-files/rooted-tree-dada2_no-mito-chloro_0.2rm_TMAOsamps_mc1.qza",  tmp = "Q2Rtemp", rm = F)
+
+# Create phyloseq object
+PSOtmao <- phyloseq(
+  otu_table(ASVr, taxa_are_rows = T), 
+  phy_tree(treeR$data), 
+  tax_table(as.data.frame(taxtable) %>% dplyr::select(-Confidence) %>% column_to_rownames("Feature.ID") %>% as.matrix()), #moving the taxonomy to the way phyloseq wants it
+  sample_data(metadata_a)
+)
+print(PSOtmao)
+
+# Save the phyloseq object
+save(PSOtmao, file = "../../data/processed/microbiome/phyloseq_objects/PSOtmao_211105.RData")
+```
