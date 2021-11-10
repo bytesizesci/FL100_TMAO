@@ -1,0 +1,49 @@
+---
+title: "Master Pheno FIle"
+author: "Kristen James"
+date: "11/8/2021"
+output: html_document
+---
+
+
+```{r Load TMAO pheno file}
+tmao <- read.csv("../../data/raw/from_RedCAP/TMAO/CTSC24532USDAWHNRCNu-TMAOKJ012220_DATA_2020-07-15_0915_NAedited.csv", row.names = 1)
+```
+
+Load tobacco data and combine it with the master object.
+```{r Load tobbaco data, results='hide'}
+dem <- read.csv("../../data/raw/from_RedCAP/demographic/CTSC24532USDAWHNRCNu-DemographicData_DATA_2020-08-28_1058.csv")
+
+dem_tobbaco <- dem[,c(1,26)] #26 in tobbaco use
+rownames(dem_tobbaco) <- dem_tobbaco[,"subject_id"]
+dem_tobbaco <- subset(dem_tobbaco, select = -c(subject_id))
+
+master <- merge(tmao, dem_tobbaco, by = 0)
+rownames(master) <- master[,1]
+master <- subset(master, select=-c(Row.names))
+```
+
+Load ethnicity data and combine it with the master object.
+```{r Load ethnicity data, results='hide'}
+eth <- read.csv("../../data/processed/ethnicity/ethnicity_210715.csv",row.names = 1)
+
+# We will reorder the levels so that it matches the order from the demographic survey. This may help prevent mistakes in the future.
+str(eth$ethnicity)
+eth$ethnicity <- ordered(eth$ethnicity, levels = c("Caucasian", "Hispanic", "African.American", "Asian", "Multi", "Other", "NA"))
+# This also turns ethnicity into a factor (not a character)
+
+# Merge
+master <- merge(master, eth, by = 0)
+rownames(master) <- master[,1]
+master <- subset(master, select=-c(Row.names))
+```
+
+```{r}
+colnames(master)
+```
+Save
+```{r}
+write.csv(master, "../../data/processed/phenotype/Phenotypes_211108.csv")
+saveRDS(master, "../../data/processed/phenotype/Phenotypes_211108.rds")
+```
+
