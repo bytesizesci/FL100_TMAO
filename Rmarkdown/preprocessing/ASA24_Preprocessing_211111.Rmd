@@ -1,0 +1,192 @@
+---
+title: "ASA24 Preprocessing"
+author: "Kristen James"
+date: "11/11/2021"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+# About
+
+**Project:** FL100
+
+**About:** We have QCed ASA24 dietary recalls and we want to find the mean intake 
+
+**Inputs:** Inputs include: 
+
+1) QCed ASA24 data in wide format with recalls 1, 2, and 3 in one file (referred to as recalls 2, 3, and 4).
+
+**Outputs:** Outputs include: 
+
+1) ASA24 data that represents average intake 
+
+**Sources:**
+
+1) NA
+
+# Set Up
+```{r}
+library(dplyr)
+```
+
+
+```{r Load QCed ASA24 recalls}
+# Read in ASA24 file with all recalls
+dat <- read.csv(file = "../../data/raw/from_RedCAP/asa24/CTSC24532USDAWHNRCNu-ASA24RecallsQCPass_DATA_2020-04-21_1710.csv", row.names = 1)
+```
+
+```{r}
+# Separate by recall
+dat2 <- dat[,grep("2$", colnames(dat))]
+dat3 <- dat[,grep("3$", colnames(dat))]
+dat4 <- dat[,grep("4$", colnames(dat))] 
+#the dimensions are all the same, good; 385x268
+
+# Remove the recall designation
+colnames(dat2) <- gsub("2$", "", colnames(dat2))
+colnames(dat3) <- gsub("3$", "", colnames(dat3))
+colnames(dat4) <- gsub("4$", "", colnames(dat4))
+
+# Save the separated recalls? 
+#write.csv(dat2, "../data_processed/factor_analysis/ASA24_Recalls/ASA24_raw_recall2.csv")
+#write.csv(dat3, "../data_processed/factor_analysis/ASA24_Recalls/ASA24_raw_recall3.csv")
+#write.csv(dat4, "../data_processed/factor_analysis/ASA24_Recalls/ASA24_raw_recall4.csv")
+
+# Check that all column and row names are identical
+identical(rownames(dat2), rownames(dat3)) # TRUE
+identical(rownames(dat2), rownames(dat4)) # TRUE
+identical(colnames(dat2), colnames(dat3)) # TRUE
+identical(colnames(dat2), colnames(dat4)) # TRUE
+
+# Before you rowbind, make a new column with subject ID
+# R will not let row names be the same. Therefore, if you don't do this,
+# then you will get wacky rownames that will cause problems in the future
+dat2$subject_id <- rownames(dat2)
+dat3$subject_id <- rownames(dat3)
+dat4$subject_id <- rownames(dat4)
+
+# Move subject ID to the 1st column for easy viewing
+dat2 <- dat2 %>% select(subject_id, everything())
+dat3 <- dat3 %>% select(subject_id, everything())
+dat4 <- dat4 %>% select(subject_id, everything())
+
+# Rowbind 
+dat23 <- rbind(dat2, dat3)
+dat_long <- rbind(dat23, dat4)
+
+# Remove columns that are not continuous 
+# Remove 1:saltused_tnf  
+colnames(dat_long)
+dat_long <- dat_long[,-c(2:16)]
+# Remove datacomp_totals:numsuppls_tns
+colnames(dat_long)
+dat_long <- dat_long[,-c(104:114)]
+# Remove datacomp_tns:saltused_tnfs
+colnames(dat_long)
+dat_long <- dat_long[,-c(157:172)]
+# Remove datacomp_tnfs:recallqc_passed_
+colnames(dat_long)
+dat_long <- dat_long[, -c(222:227)]
+
+# Check structure (want all numeric)
+str(dat_long)
+```
+
+```{r Calculate mean intake}
+# Calculate mean intake
+# All data
+dat_mean <- stats::aggregate(dat_long[,2:221], list(dat_long$subject_id), mean, na.rm = TRUE)
+row.names(dat_mean) <- dat_mean[,"Group.1"]
+dat_mean <- subset(dat_mean, select = -c(Group.1))
+# Note, by specifying na.rm = TRUE, then when there are only 2 entries it will divide by 2 to get mean
+# Otherwise, it will put an NA in the mean entry and not calculate a value
+# So, this is the mean intake when the food is eaten
+
+# No supplements (many NAs removed)
+# If desired, remove columns that refer to supplements only. There are many NAs in supplements. 
+# NAs can be problematic.
+dat_noSup <- dat_long[, -c(grep("tns$", colnames(dat_long)))]
+dat_mean_noSup <- aggregate(dat_noSup[,2:168], list(dat_noSup$subject_id), mean, na.rm = TRUE)
+row.names(dat_mean_noSup) <- dat_mean_noSup[,"Group.1"]
+dat_mean_noSup <- subset(dat_mean_noSup, select = -c(Group.1))
+```
+
+```{r Save averaged data}
+# Save 
+# csv
+write.csv(dat_mean, file = "../../data/processed/asa24/ASA24_meanIntake_211111.csv")
+write.csv(dat_mean_noSup, file = "../../data/processed/asa24/ASA24_noSupplements_meanIntake_211111.csv")
+# rds
+saveRDS(dat_mean, file = "../../data/processed/asa24/ASA24_meanIntake_211111.rds")
+saveRDS(dat_mean_noSup, file = "../../data/processed/asa24/ASA24_noSupplements_meanIntake_211111.rds")
+```
+
+Many of these variables do not have a normal distribution. We will use this data to run parametric statistics so go ahead and transform key variables for future use. 
+
+```{r Transform}
+dat_mean2 <- dat_mean
+
+dat_mean2$T.pf_mps_totals_sqrRt <- dat_mean2$pf_meat_totals ^ .5
+dat_mean2$T.pf_meat_totals_sqrRt <- dat_mean2$pf_meat_totals ^ .5
+dat_mean2$T.pf_curedmeat_totals_sqrRt <- dat_mean2$pf_curedmeat_totals ^ .5
+dat_mean2$T.pf_poult_totals_sqrRt <- dat_mean2$pf_poult_totals ^ .5
+dat_mean2$T.pf_seafd_hi_totals_Binary <- ifelse(dat_mean2$pf_seafd_hi_totals > 0, "Consumes", "DoesNotConsume")
+dat_mean2$T.pf_seafd_low_totals_Binary <- ifelse(dat_mean2$pf_seafd_low_totals > 0, "Consumes", "DoesNotConsume")
+dat_mean2$T.pf_eggs_totals_sqrRt <- dat_mean2$pf_eggs_totals ^ .5
+dat_mean2$T.pf_nutsds_totals_sqrRt <- dat_mean2$pf_nutsds_totals ^ .5
+dat_mean2$T.pf_legumes_totals_sqrRt <- dat_mean2$pf_legumes_totals ^ .5
+dat_mean2$T.pf_total_totals_natLog <- log(dat_mean2$pf_total_totals)
+dat_mean2$T.pf_soy_totals_Binary <- ifelse(dat_mean2$pf_soy_totals > 0, "Consumes", "DoesNotConsume")
+dat_mean2$T.v_drkgr_totals_sqrRt <- dat_mean2$v_drkgr_totals ^ .5
+dat_mean2$T.v_redor_total_totals_sqrRt <- dat_mean2$v_redor_total_totals ^ .5
+dat_mean2$T.v_redor_tomato_totals_sqrRt <- dat_mean2$v_redor_tomato_totals ^ .5
+dat_mean2$T.v_redor_other_totals_sqrRt <- dat_mean2$v_redor_other_totals ^ .5
+dat_mean2$T.v_starchy_total_totals_sqrRt <- dat_mean2$v_starchy_total_totals ^ .5
+dat_mean2$T.v_starchy_potato_totals_sqrRt <- dat_mean2$v_starchy_potato_totals ^ .5
+dat_mean2$T.v_starchy_other_totals_sqrRt <- dat_mean2$v_starchy_other_totals ^ .5
+dat_mean2$T.v_other_totals_sqrRt <- dat_mean2$v_other_totals ^ .5
+dat_mean2$T.v_total_totals_sqrRt <- dat_mean2$v_total_totals ^ .5
+dat_mean2$T.v_legumes_total_sqrRt <- dat_mean2$v_legumes_total ^ .5
+dat_mean2$T.g_whole_totals_sqrRt <- dat_mean2$g_whole_totals ^ .5
+dat_mean2$T.g_refined_totals_sqrRt <- dat_mean2$g_refined_totals ^ .5
+#g_total_totals <- #none
+dat_mean2$T.d_total_totals_sqrRt <- dat_mean2$d_total_totals ^ .5
+dat_mean2$T.d_milk_totals_sqrRt <- dat_mean2$d_milk_totals ^ .5
+dat_mean2$T.d_cheese_totals_sqrRt <- dat_mean2$d_cheese_totals ^ .5
+dat_mean2$T.d_yogurt_totals_Binary <- ifelse(dat_mean2$d_yogurt_totals > 0, "Consumes", "DoesNotConsume")
+```
+
+Save
+```{r Save averaged data with transformations}
+# rds
+saveRDS(dat_mean2, file = "../../data/processed/asa24/ASA24_meanIntake_withTransformations_211111.rds")
+```
+
+
+Little exploration below. Pay no mind.
+```{r}
+# Count number of subjects with 2 vs 3 recalls
+dat2_count <- dat2[complete.cases(dat2$lang_tnf),] # 384
+dat3_count <- dat3[complete.cases(dat3$lang_tnf),] # 378
+dat4_count <- dat4[complete.cases(dat4$lang_tnf),] # 347
+
+# What is the distribution of meat intake across the recalls?
+summary(dat2$pf_meat_totals)
+summary(dat3$pf_meat_totals)
+summary(dat4$pf_meat_totals)
+
+summary(dat2$pf_curedmeat_totals)
+summary(dat3$pf_curedmeat_totals)
+summary(dat4$pf_curedmeat_totals)
+
+t.test(dat2$pf_curedmeat_totals, dat4$pf_curedmeat_totals) # not different, good
+
+# List of TMAO subjects
+
+# List of subjects with at least 2 recalls and TMAO data
+
+# List of subjects with at least 3 recalls and TMAO data
+```
+
