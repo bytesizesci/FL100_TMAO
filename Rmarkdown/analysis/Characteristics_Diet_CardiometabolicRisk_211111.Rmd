@@ -1,0 +1,315 @@
+---
+title: "Describe Participants: Characteristics, Diet, and Cardiometabolic Risk"
+author: "Kristen James"
+date: "11/11/2021"
+output: html_document
+---
+# About
+
+**Project:** FL100
+
+**About:** Objectives of the paper analyzed in this markdown include: 
+
+1) Who are the participants in the study? --> Demonstrate who is in the study by making tables and plots for the manuscript.
+2) What do they eat? --> Describe food intake by TMAO quartile. Complete multiple linear regression analysis.
+3) Are TMAO levels related to cardiometabolic risk? --> Complete multiple linear regression analysis.
+
+**Inputs:** Inputs include: 
+
+1) Master phenotype data
+2) ASA24 averaged data with transformations
+
+
+**Outputs:** Outputs include: 
+
+1) 
+
+**Sources:**
+
+```{r Libraries, warning=FALSE, message=FALSE}
+library(plyr)
+library(tableone)
+```
+
+
+```{r Load data}
+phen <- readRDS("../../data/processed/phenotype/Phenotypes_211108.rds")
+
+# Complete TMAO data only
+phen <- phen[complete.cases(phen$tmao == TRUE),]
+
+# Get rid of NA ethnicity category
+phen$ethnicity <- droplevels(phen$ethnicity)
+
+# Factor and recode sex
+phen$sex <- as.factor(phen$sex)
+phen$sex <- plyr::revalue(phen$sex, c("1" = "Male", "2" = "Female"))
+
+# Make TMAO log variable
+phen$tmao_log <- log(phen$tmao)
+```
+
+# Descriptive Characteristics
+
+## Table 1. Descriptive characteristics of participants 
+
+Note, crp is in units of ng/mL. Report in mg/dL so multiply by 0.0001.
+il6 is in units of pg/mL
+tnfa is in units of pg/mL
+
+```{r Convert crp units}
+phen$crp_bd1.mgdL <- phen$crp_bd1 * 0.0001
+```
+
+
+```{r Participant characterisitics}
+# TMAO table by age bin - females
+factorVars <- c("age_cat")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.f <- CreateTableOne(vars = vars,
+                                    strata = "age_cat",
+                                    data = phen[phen$sex == "Female",],
+                                    factorVars = factorVars)
+table_tmao.f
+
+# TMAO table by age bin - males
+factorVars <- c("age_cat")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.m <- CreateTableOne(vars = vars,
+                                    strata = "age_cat",
+                                    data = phen[phen$sex == "Male",],
+                                    factorVars = factorVars)
+table_tmao.m
+
+# TMAO table by sex
+factorVars <- c("sex")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.all <- CreateTableOne(vars = vars,
+                                    strata = "sex",
+                                    data = phen,
+                                    factorVars = factorVars)
+table_tmao.all
+```
+
+Save the tables
+
+```{r Save characteristic tables}
+table_save.f <- print(table_tmao.f, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.f, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byAgeBin_211111.csv")
+
+table_save.m <- print(table_tmao.m, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.m, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byAgeBin_211111.csv")
+
+table_save.all <- print(table_tmao.all, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.all, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_bySex_211111.csv")
+```
+
+Is TMAO significantly different by ethnicity?
+```{r Ethnicity}
+ethnicity_aov <- (aov(tmao_log ~ ethnicity, phen))
+summary(ethnicity_aov)
+TukeyHSD(ethnicity_aov)
+
+ethnicity_lm <- (lm(tmao_log ~ ethnicity + sex:age + cystatinc_bd1, phen))
+summary(ethnicity_lm)
+```
+
+There are significant differences in TMAO levels by ethnic groups but ethnicity does not predict TMAO. 
+
+Back to tables... make similar tables but show TMAO quantiles
+
+```{r Quantile TMAO}
+tmao_quantile <- quantile(phen$tmao)
+phen$tmao_quantile <- ifelse(phen$tmao <= tmao_quantile[2], "Quantile1",
+                             ifelse(phen$tmao > tmao_quantile[2] & phen$tmao <= tmao_quantile[3], "Quantile2",
+                                   ifelse(phen$tmao > tmao_quantile[3] & phen$tmao <= tmao_quantile[4], "Quantile3", "Quantile4")))
+
+# Check it
+table(phen$tmao_quantile)
+phen$tmao_quantile <- as.factor(phen$tmao_quantile)
+str(phen$tmao_quantile)
+```
+
+
+```{r Participant characterisitics by TMAO quantile}
+# TMAO table by age bin - females
+factorVars <- c("age_cat", "tmao_quantile")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.fq <- CreateTableOne(vars = vars,
+                                    strata = "tmao_quantile",
+                                    data = phen[phen$sex == "Female",],
+                                    factorVars = factorVars)
+table_tmao.fq
+
+# TMAO table by age bin - males
+factorVars <- c("age_cat", "tmao_quantile")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.mq <- CreateTableOne(vars = vars,
+                                    strata = "tmao_quantile",
+                                    data = phen[phen$sex == "Male",],
+                                    factorVars = factorVars)
+table_tmao.mq
+
+# TMAO table by sex
+factorVars <- c("tmao_quantile")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.allq <- CreateTableOne(vars = vars,
+                                    strata = "tmao_quantile",
+                                    data = phen,
+                                    factorVars = factorVars)
+table_tmao.allq
+```
+
+```{r Save characteristic quantile tables}
+table_save.fq <- print(table_tmao.fq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byTMAOQuantile_211111.csv")
+
+table_save.mq <- print(table_tmao.mq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byTMAOQuantile_211111.csv")
+
+table_save.allq <- print(table_tmao.allq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOQuantile_211111.csv")
+```
+
+# Cardiometabolic Risk Analysis 
+
+```{r Cardiometabolic Multiple Linear Regression}
+# Checked all variables for normality via shapiro.test() in console. TG, and glc ere the only ones that didn't pass.
+phen$glc_bd1_ln <- log(phen$glc_bd1)
+phen$tg_bd1_ln <- log(phen$tg_bd1)
+phen$crp_bd1_ln <- log(phen$crp_bd1)
+phen$tnfa_bd1_ln <- log(phen$tnfa_bd1)
+phen$il6_bd1_ln <- log(phen$il6_bd1)
+
+
+transformed_keep_cardio_tbl <- c("sex", "age","ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
+
+#~~~~~~~~
+# TMAO  
+#~~~~~~~~
+# Make a smaller df from master (the old data)
+phen_sub <- phen[, colnames(phen) %in% transformed_keep_cardio_tbl]
+cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log)) # change variable here
+n <- ncol(cvd_biomark)
+
+# LCMS method
+# Run linear model
+my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, phen_sub )) # include kcal
+
+# Organize results
+my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
+my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [CVD row, estimate] corresponds to CVD B 
+my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [CVD row, Std.Error] corresponds to CVD Std. Error 
+my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [CVD row, T value] corresponds to CVD t value
+my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [CVD row, P] corresponds to CVD P value
+my_lm361_lcms_cvd <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
+colnames(my_lm361_lcms_cvd) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
+row.names(my_lm361_lcms_cvd) <- colnames(cvd_biomark)
+res <- as.data.frame(my_lm361_lcms_cvd)
+
+# BH correction
+res$p.adj <- stats::p.adjust(res$P, method = "BH", n = n) 
+
+# Save table
+write.csv(res, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_211111.csv")
+```
+
+# Diet Analysis
+
+Load the diet data. 
+
+```{r Load ASA24 averaged data}
+food <- readRDS(file = "../../data/processed/asa24/ASA24_meanIntake_withTransformations_211111.rds")
+
+# Combine food with phenotype data
+full <- merge(phen, food, by = 0)
+row.names(full) <- full[,"Row.names"]
+full <- subset(full, select = -c(Row.names))
+```
+
+Make a list of foods and covariate variables to keep.
+
+```{r Foods to keep, results='hide'}
+transformed_keep_tbl <- c("sex", 
+#"sex_numeric",
+"kcal_tnfs", 
+"age", 
+"cystatinc_bd1", 
+"ethnicity",
+"tmao", 
+"tmao_log", 
+#"TMAO.0",
+#"TMAO.30",
+#"TMAO.180",
+#"TMAO.360",
+#"lnTMAO.0",
+#"lnTMAO.30",
+#"lnTMAO.180",
+#"lnTMAO.360",
+#"TMAO_0_30",
+#"TMAO_0_180",
+#"TMAO_0_360",
+#"Ind.SO4",
+#"p.Cresol.SO4",
+#"TMAO_quart_num",
+#"T.pf_mps_totals_sqrRt",
+"T.pf_meat_totals_sqrRt",
+"T.pf_curedmeat_totals_sqrRt",
+"T.pf_poult_totals_sqrRt",
+"T.pf_seafd_hi_totals_Binary",
+"T.pf_seafd_low_totals_Binary",
+"T.pf_eggs_totals_sqrRt",
+"T.pf_nutsds_totals_sqrRt",
+"T.pf_legumes_totals_sqrRt",
+"T.pf_total_totals_natLog",
+#"T.pf_soy_totals_Binary",
+"T.v_drkgr_totals_sqrRt",
+"T.v_redor_total_totals_sqrRt",
+#"T.v_redor_tomato_totals_sqrRt",
+#"T.v_redor_other_totals_sqrRt",
+"T.v_starchy_total_totals_sqrRt",
+#"T.v_starchy_potato_totals_sqrRt",
+#"T.v_starchy_other_totals_sqrRt",
+"T.v_other_totals_sqrRt",
+"T.v_total_totals_sqrRt",
+#"T.v_legumes_total_sqrRt",
+"T.g_whole_totals_sqrRt",
+"T.g_refined_totals_sqrRt",
+"g_total_totals",
+"T.d_total_totals_sqrRt",
+"T.d_milk_totals_sqrRt",
+"T.d_cheese_totals_sqrRt",
+"T.d_yogurt_totals_Binary"
+)
+```
+
+Now run the multiple linear regression. 
+
+```{r TMAO ~ food - LCMS BD1 - lm 356 ppl, results='hide'}
+# Make a smaller df from master (the old data)
+full_sub <- full[, colnames(full) %in% transformed_keep_tbl]
+food <- subset(full_sub, select = -c(sex, kcal_tnfs, age, cystatinc_bd1, ethnicity, tmao, tmao_log))
+n <- ncol(food)
+
+# LCMS method
+# Run linear model
+my_lm <- lapply(1:n, function(x) lm(tmao_log ~ food[,x] + sex*age + cystatinc_bd1 + ethnicity + kcal_tnfs, full_sub )) # include kcal
+
+# Organize results
+my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
+my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [food row, estimate] corresponds to food B 
+my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [food row, Std.Error] corresponds to food Std. Error 
+my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [food row, T value] corresponds to food t value
+my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [food row, P] corresponds to food P value
+my_lm356_lcms <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
+colnames(my_lm356_lcms) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
+row.names(my_lm356_lcms) <- colnames(food)
+res_food <- as.data.frame(my_lm356_lcms)
+
+# BH correction
+res_food$p.adj <- stats::p.adjust(res_food$P, method = "BH", n = n) 
+
+# Save table
+write.csv(res_food, "../../Outputs/tables/Diet/MultipleLinReg_TMAO_LCMS_n356_ASA24_211111.csv")
+```
+
