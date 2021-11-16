@@ -110,7 +110,7 @@ ethnicity_aov <- (aov(tmao_log ~ ethnicity, phen))
 summary(ethnicity_aov)
 TukeyHSD(ethnicity_aov)
 
-ethnicity_lm <- (lm(tmao_log ~ ethnicity + sex:age + cystatinc_bd1, phen))
+ethnicity_lm <- (lm(tmao_log ~ ethnicity + sex*age + cystatinc_bd1, phen))
 summary(ethnicity_lm)
 ```
 
@@ -128,6 +128,13 @@ phen$tmao_quantile <- ifelse(phen$tmao <= tmao_quantile[2], "Quantile1",
 table(phen$tmao_quantile)
 phen$tmao_quantile <- as.factor(phen$tmao_quantile)
 str(phen$tmao_quantile)
+
+# Checked all variables for normality via shapiro.test() in console. TG, and glc ere the only ones that didn't pass.
+phen$glc_bd1_ln <- log(phen$glc_bd1)
+phen$tg_bd1_ln <- log(phen$tg_bd1)
+phen$crp_bd1_ln <- log(phen$crp_bd1)
+phen$tnfa_bd1_ln <- log(phen$tnfa_bd1)
+phen$il6_bd1_ln <- log(phen$il6_bd1)
 ```
 
 
@@ -173,16 +180,11 @@ write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Characte
 
 # Cardiometabolic Risk Analysis 
 
+Note, we will remove ethnicity in these regressions because when we specifically asked if ethnicity was related to the cardiometabolic risk variables there were all non-significant relationships (uncomment the line to demonstrate for yourself). We will keep cystatin C in the regression using the same reasoning - many significant relationships.
+
 ```{r Cardiometabolic Multiple Linear Regression}
-# Checked all variables for normality via shapiro.test() in console. TG, and glc ere the only ones that didn't pass.
-phen$glc_bd1_ln <- log(phen$glc_bd1)
-phen$tg_bd1_ln <- log(phen$tg_bd1)
-phen$crp_bd1_ln <- log(phen$crp_bd1)
-phen$tnfa_bd1_ln <- log(phen$tnfa_bd1)
-phen$il6_bd1_ln <- log(phen$il6_bd1)
-
-
-transformed_keep_cardio_tbl <- c("sex", "age","ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
+# Transfored variable list
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
 
 #~~~~~~~~
 # TMAO  
@@ -194,7 +196,9 @@ n <- ncol(cvd_biomark)
 
 # LCMS method
 # Run linear model
-my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, phen_sub )) # include kcal
+my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + sex + age + cystatinc_bd1, phen_sub )) # include kcal
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ ethnicity, phen_sub ))
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ cystatinc_bd1, phen_sub ))
 
 # Organize results
 my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
@@ -209,10 +213,101 @@ res <- as.data.frame(my_lm361_lcms_cvd)
 
 # BH correction
 res$p.adj <- stats::p.adjust(res$P, method = "BH", n = n) 
+```
 
+Save table
+```{r Save TMAO linear regression table}
 # Save table
 write.csv(res, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_211111.csv")
 ```
+
+## Females 
+```{r Cardiometabolic Multiple Linear Regression - Females}
+# Transfored variable list
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
+
+#~~~~~~~~
+# TMAO  
+#~~~~~~~~
+# Make a smaller df from master (the old data)
+phen_sub <- phen[, colnames(phen) %in% transformed_keep_cardio_tbl]
+# Sex data frame
+phen_sub.f <- phen_sub[phen_sub$sex == "Female",]
+cvd_biomark <- subset(phen_sub.f, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log)) # change variable here
+n <- ncol(cvd_biomark)
+
+# LCMS method
+# Run linear model
+my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + age + cystatinc_bd1, phen_sub.f )) # take out sex
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ ethnicity, phen_sub ))
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ cystatinc_bd1, phen_sub ))
+
+# Organize results
+my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
+my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [CVD row, estimate] corresponds to CVD B 
+my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [CVD row, Std.Error] corresponds to CVD Std. Error 
+my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [CVD row, T value] corresponds to CVD t value
+my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [CVD row, P] corresponds to CVD P value
+my_lm361_lcms_cvd.f <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
+colnames(my_lm361_lcms_cvd.f) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
+row.names(my_lm361_lcms_cvd.f) <- colnames(cvd_biomark)
+res.f <- as.data.frame(my_lm361_lcms_cvd.f)
+
+# BH correction
+res.f$p.adj <- stats::p.adjust(res.f$P, method = "BH", n = n) 
+```
+
+Save table
+```{r Save TMAO linear regression table - Females}
+# Save table
+write.csv(res.f, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_females_211112.csv")
+```
+
+No significant effects found in female only cohort. 
+
+## Males 
+```{r Cardiometabolic Multiple Linear Regression - Males}
+# Transfored variable list
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
+
+#~~~~~~~~
+# TMAO  
+#~~~~~~~~
+# Make a smaller df from master (the old data)
+phen_sub <- phen[, colnames(phen) %in% transformed_keep_cardio_tbl]
+# Sex data frame
+phen_sub.m <- phen_sub[phen_sub$sex == "Male",]
+cvd_biomark <- subset(phen_sub.m, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log)) # change variable here
+n <- ncol(cvd_biomark)
+
+# LCMS method
+# Run linear model
+my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + age + cystatinc_bd1, phen_sub.m )) # take out sex
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ ethnicity, phen_sub ))
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ cystatinc_bd1, phen_sub ))
+
+# Organize results
+my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
+my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [CVD row, estimate] corresponds to CVD B 
+my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [CVD row, Std.Error] corresponds to CVD Std. Error 
+my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [CVD row, T value] corresponds to CVD t value
+my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [CVD row, P] corresponds to CVD P value
+my_lm361_lcms_cvd.m <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
+colnames(my_lm361_lcms_cvd.m) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
+row.names(my_lm361_lcms_cvd.m) <- colnames(cvd_biomark)
+res.m <- as.data.frame(my_lm361_lcms_cvd.m)
+
+# BH correction
+res.m$p.adj <- stats::p.adjust(res.m$P, method = "BH", n = n) 
+```
+
+Save table
+```{r Save TMAO linear regression table - Males}
+# Save table
+write.csv(res.m, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_males_211112.csv")
+```
+
+No significant effects found in male only cohort. 
 
 # Diet Analysis
 
@@ -283,7 +378,7 @@ transformed_keep_tbl <- c("sex",
 )
 ```
 
-Now run the multiple linear regression. 
+Now run the multiple linear regression. Note, we will not include ethnicity in these regressions because although TMAO levels significantly differ between ethnic groups, there was no relationship between TMAO and ethnicity. Additionally, diet patterns differ by ethnicity so we could be over adjusting.
 
 ```{r TMAO ~ food - LCMS BD1 - lm 356 ppl, results='hide'}
 # Make a smaller df from master (the old data)
@@ -293,7 +388,7 @@ n <- ncol(food)
 
 # LCMS method
 # Run linear model
-my_lm <- lapply(1:n, function(x) lm(tmao_log ~ food[,x] + sex*age + cystatinc_bd1 + ethnicity + kcal_tnfs, full_sub )) # include kcal
+my_lm <- lapply(1:n, function(x) lm(tmao_log ~ food[,x] + sex*age + cystatinc_bd1 + kcal_tnfs, full_sub )) # include kcal
 
 # Organize results
 my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
@@ -308,8 +403,119 @@ res_food <- as.data.frame(my_lm356_lcms)
 
 # BH correction
 res_food$p.adj <- stats::p.adjust(res_food$P, method = "BH", n = n) 
+```
 
+Save
+```{r save food linear regression table}
 # Save table
 write.csv(res_food, "../../Outputs/tables/Diet/MultipleLinReg_TMAO_LCMS_n356_ASA24_211111.csv")
 ```
+
+Make TMAO food intake by quantile table
+```{r Food Intake by TMAO quantile}
+# TMAO table by age bin - females
+factorVars <- c("age_cat", "tmao_quantile")
+vars <- c("pf_meat_totals", 
+          "pf_curedmeat_totals",
+          "pf_poult_totals",
+          "pf_seafd_hi_totals",
+          "pf_seafd_low_totals",
+          "pf_eggs_totals",
+          "pf_nutsds_totals",
+          "pf_legumes_totals",
+          "pf_total_totals",
+          #"pf_soy_totals_Binary",
+          "v_drkgr_totals",
+          "v_redor_total_totals",
+          #"v_redor_tomato_totals",
+          #"v_redor_other_totals",
+          "v_starchy_total_totals",
+          #"v_starchy_potato_totals",
+          #"v_starchy_other_totals",
+          "v_other_totals",
+          "v_total_totals",
+          #"v_legumes_total",
+          "g_whole_totals",
+          "g_refined_totals",
+          "g_total_totals",
+          "d_total_totals",
+          "d_milk_totals",
+          "d_cheese_totals",
+          "d_yogurt_totals",
+          "hei_asa24_totalscore",
+          "hei_asa24_totalveg",
+          "hei_asa24_sfat",
+          "hei_asa24_",
+          "age",
+          "ethnicity" ,
+          "bmi_final",
+          "tmao",
+          "choline",
+          "betaine",
+          "carnitine")
+table_food.fq <- CreateTableOne(vars = vars,
+                                    strata = "tmao_quantile",
+                                    data = full[full$sex == "Female",],
+                                    factorVars = factorVars)
+table_food.fq
+
+# TMAO table by age bin - males
+table_food.mq <- CreateTableOne(vars = vars,
+                                    strata = "tmao_quantile",
+                                    data = full[full$sex == "Male",],
+                                    factorVars = factorVars)
+table_food.mq
+
+# TMAO table by sex
+table_food.allq <- CreateTableOne(vars = vars,
+                                    strata = "tmao_quantile",
+                                    data = full,
+                                    factorVars = factorVars)
+table_food.allq
+```
+
+```{r Save food quantile tables}
+table_save.fq <- print(table_food.fq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Food_Female_byTMAOQuantile_211111.csv")
+
+table_save.mq <- print(table_food.mq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Food_Male_byTMAOQuantile_211111.csv")
+
+table_save.allq <- print(table_food.allq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOQuantile_211111.csv")
+```
+
+# Miscellaneous for paper
+
+Demonstrate the sex:age interaction for females.
+```{r sex*age interaction}
+summary(lm(tmao_log ~ sex*age + ethnicity + cystatinc_bd1, phen))
+```
+
+Describe meat intake in the cohort
+
+```{r Meat intake}
+# Beef, veal, pork, lamb, and game meat; excludes organ meat and cured meat (oz. eq.)
+summary(full$pf_meat_totals)
+
+# Frankfurters, sausages, corned beef, and luncheon meat that are made from beef, pork, or poultry (oz. eq.)
+summary(full$pf_curedmeat_totals)
+
+# Total meat, poultry, organ meat, cured meat, seafood, eggs, soy, and nuts and seeds; excludes legumes (oz. eq.)
+summary(full$pf_total_totals)
+
+# Total of meat, poultry, seafood, organ meat, and cured meat (oz. eq.)
+summary(full$pf_mps_total_totals)
+
+# Kcal
+summary(full$kcal_tnfs)
+```
+
+```{r}
+full$low_mps_meat <- ifelse(full$pf_mps_total_totals <= median(full$pf_mps_total_totals), "low", "high")
+full$low_mps_meat <- ifelse(full$pf_mps_total_totals <= 9.091, "low", "high")
+summary(lm(tmao_log ~ low_mps_meat + sex*age + cystatinc_bd1 + kcal_tnfs, full))
+```
+
+
 
