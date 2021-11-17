@@ -236,8 +236,8 @@ PSOtmao4G
 
 Save
 
-```{r save PSOtmao5}
-save(PSOtmao4G, file = "../../data/processed/microbiome/phyloseq_objects/PSOtmao5_211111.RData")
+```{r save PSOtmao4G}
+save(PSOtmao4G, file = "../../data/processed/microbiome/phyloseq_objects/PSOtmao4G_211111.RData")
 ```
 
 # Phylogenetic Abundance plots
@@ -249,7 +249,7 @@ PSOtmao3F.top10 <- microbiome::aggregate_top_taxa(PSOtmao3, "Family", top = 10)
 
 ps3F.10.family.comp <- microbiome::transform(PSOtmao3F.top10, transform="compositional")
 
-plot.composition.relAbun <- plot_composition(ps3F.10.family.comp,
+plot.composition.relAbun <- microbiome::plot_composition(ps3F.10.family.comp,
                                              sample.sort = "Description",
                                              x.label = "tmao_quantile",
                                              group_by = "tmao_quantile",
@@ -302,8 +302,8 @@ sigtabgen$Genus = factor(as.character(sigtabgen$Genus), levels=names(x))
 ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) + 
   geom_vline(xintercept = 0.0, color = "gray", size = 0.5) +
   geom_point(size=3) + 
-  xlab("Taxonomy") +
-  ylab("Log2 Fold Change") + 
+  ylab("Taxonomy") +
+  xlab("Log2 Fold Change") + 
   scale_color_brewer(palette = "Dark2") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
@@ -560,7 +560,7 @@ dismax_bc = phyloseq::distance(PSOtmao4G, method="bray", type = "samples")
 
 ```{r Beta diversity stats}
 # Get sample_data
-df <- as(sample_data(PSOtmao5), "data.frame")
+df <- as(sample_data(PSOtmao4G), "data.frame")
 df$tmao_mdn <- relevel(df$tmao_mdn, ref = "below")
 
 #~~~~~~~~~~~
@@ -600,7 +600,162 @@ adonis2(dismax_bc ~ tmao_log + sex:age + bmi_final.y, data=df, method = "bray", 
 
 # ANCOM
 
+## ANCOM2 no-covariate analysis
+
 ```{r ANCOM - genus level}
+source("../../Rscripts/ancom_v2.1.R")
+
+# OTU table
+MicroData <- otu_table(PSOtmao4G)
+MicroData <- as.data.frame(as.matrix(MicroData), stringsAsFactors = F)
+# Add 1
+#MicroData2 <- MicroData +1
+#MicroData2 <- as.data.frame(as.matrix(t(MicroData2),stringsAsFactors = F))
+#dim(MicroData2) # 103 x 98
+
+# Load the phenotype data
+#------------------------
+# Perform ANCOM analysis
+# Step 1: Data preprocessing
+# OTU data
+otu_data <- otu_table(PSOtmao4G)
+otu_data <- as.data.frame(as.matrix(otu_data), stringsAsFactors = F)
+otu_id <- rownames(otu_data)
+
+# Metadata 
+#df <- readRDS("../data_processed/mapping/Biocrates_mapping_BD1_210809.rds")
+#df$p.Cresol.SO4_bd1_mdn <- plyr::revalue(df$p.Cresol.SO4_bd1_mdn, c("0" = "< Median", "1" = "> Median"))
+# Subset
+MetaData2 <- df_alpha2 %>% dplyr::select(c(tmao_mdn, age, sex, bmi_final))
+MetaData2$Sample.ID <- rownames(MetaData2)
+
+
+feature_table = otu_data; sample_var = "Sample.ID"; group_var = NULL
+out_cut = 0.05; zero_cut = 0.95; lib_cut = 1000; neg_lb = FALSE # make zero_cut=0.95 to match criteria used for other metabolites
+# Function
+prepro = feature_table_pre_process(feature_table = feature_table,
+                                   meta_data = MetaData2,
+                                   sample_var = sample_var,
+                                   group_var = NULL,
+                                   out_cut = out_cut,
+                                   zero_cut = zero_cut,
+                                   lib_cut = lib_cut,
+                                   neg_lb = neg_lb)
+
+# Step 2: ANCOM
+feature_table = prepro$feature_table 
+meta_data = prepro$meta_data
+struc_zero = prepro$structure_zeros
+
+# Define variables for ANCOM
+main_var = "tmao_mdn"; p_adj_method = "BH"; alpha = 0.05
+adj_formula = NULL ; rand_formula = NULL
+# Run ANCCOM
+t_start = Sys.time()
+res = ANCOM(feature_table = feature_table, 
+            meta_data = meta_data, 
+            struc_zero = struc_zero, 
+            main_var = main_var, 
+            p_adj_method = p_adj_method, 
+            alpha = alpha, 
+            adj_formula = adj_formula, 
+            rand_formula = rand_formula)
+t_end = Sys.time()
+t_run = t_end - t_start 
+t_run # around 5s
+
+# Results
+res$out
+res$fig$data
+
+# Step 3: Volcano Plot
+# Number of taxa except structural zeros
+n_taxa = ifelse(is.null(struc_zero), nrow(feature_table), sum(apply(struc_zero, 1, sum) == 0))
+# Cutoff values for declaring differentially abundant taxa
+cut_off = c(0.9 * (n_taxa -1), 0.8 * (n_taxa -1), 0.7 * (n_taxa -1), 0.6 * (n_taxa -1))
+names(cut_off) = c("detected_0.9", "detected_0.8", "detected_0.7", "detected_0.6")
+
+# Annotation data
+dat_ann = data.frame(x = min(res$fig$data$x), y = cut_off["detected_0.7"], label = "W[0.7]")
+
+fig = res$fig +  
+  geom_hline(yintercept = cut_off["detected_0.7"], linetype = "dashed") + 
+  geom_text(data = dat_ann, aes(x = x, y = y, label = label), 
+            size = 4, vjust = -0.5, hjust = 0, color = "orange", parse = TRUE)
+fig  
+
+# ORGANIZE PLOT
+
+TaxaData2 <- readRDS("../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.rds")
+rownames(TaxaData2) <- TaxaData2$Feature.ID
+
+ancomRes <- res$out
+
+test <- merge(ancomRes, TaxaData2, by.x = "taxa_id", by.y = "Feature.ID", all.x = TRUE, all.y = FALSE)
+
+# Make plot 
+tempdata <- test[test$detected_0.6 == TRUE,] # 0.6 but can make 0.7
+asv_id <- unique(tempdata$taxa_id)
+
+MicroData4 <- feature_table[row.names(feature_table) %in% asv_id,]
+
+# Rename to the taxonomy 
+#MicroData5 <- as.data.frame(as.matrix(t(MicroData4)))
+TaxaData3 <- TaxaData2 %>% dplyr::select(Order, Family, Genus)
+# Make a unique naming column that incorporates multiple levels of taxonomy
+TaxaData3$OrderFamilyGenus <- paste(TaxaData3$Order, TaxaData3$Family, TaxaData3$Genus)
+rownames(TaxaData3) <- rownames(TaxaData2)
+# Merge
+MicroData5 <- merge(MicroData4, TaxaData3,
+                    by=0, all.x = T, all.y = F)
+
+row.names(MicroData5) <- MicroData5$OrderFamilyGenus
+
+MicroData5 <- MicroData5 %>%  dplyr::select(-Order, -Family, -Genus, -OrderFamilyGenus, -Row.names)
+MicroData5 <- as.data.frame(as.matrix(t(MicroData5)))
+
+# Merge with the phenotype data 
+MetaData3 <- MetaData2 %>% dplyr::select(tmao_mdn)
+
+ggData <- merge(MetaData3, MicroData5, by =0)
+row.names(ggData) <- ggData$Row.names
+ggData <- ggData %>% dplyr::select(-Row.names)
+
+# Gather the data
+library(tidyr)
+ggData2 <- gather(ggData,
+                  key = "Taxa",
+                  value = "Abundance",
+                  -tmao_mdn)
+                
+ggData2$Abundance <- log(ggData2$Abundance)
+
+# Plot it
+p <- ggplot(data = ggData2,
+            aes(x = Taxa, 
+                y = Abundance,
+                fill = tmao_mdn), 
+            alpha = 0.1) +
+  geom_boxplot(lwd=.25) +
+  xlab(NULL) +
+  ylab("Log of Taxa Abundance") +
+  theme_bw() + # note order matters here - need bw to be before theme()
+  theme(axis.text.y = element_text( hjust = 1),
+        axis.text.x = element_text(angle = 60, hjust = 1),
+        text=element_text(size=11))  +
+  scale_fill_manual(values=c("#2D708EFF", "#B8DE29FF")) + 
+  #scale_fill_viridis(discrete = TRUE) +
+  #coord_flip() +
+  labs(fill = "TMAO \n Classification")
+
+p
+```
+
+
+## ANCOM2 covariate analysis
+ANCOM2 lets you include covariates into the analysis. If we add the same covariates as in the DESeq2 analysis, do we get similar results? 
+
+```{r ANCOM - genus level with covariates}
 source("../../Rscripts/ancom_v2.1.R")
 
 # OTU table
