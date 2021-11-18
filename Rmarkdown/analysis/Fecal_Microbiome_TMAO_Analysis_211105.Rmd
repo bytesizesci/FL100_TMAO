@@ -16,7 +16,7 @@ output:
 
 **Inputs:** Inputs include: 
 
-1) TMAO phyloseq object
+1) TMAO phyloseq object. Recall, the data from Dr. Kable was filtered to taxa with 2% abundance, which removes technical noise. Therefore, the remaining data is believable. Further filtering we do will be driven by our interest in more prevalent taxa. Furthermore, we should not recalculate the alpha diversity statistics after our filtering because that would incorrectly describe the microbiome environment.
 2) Master phenotype data
 
 **Outputs:** Outputs include: 
@@ -66,13 +66,22 @@ sample_data(PSOtmao)$tmao_quantile <- ifelse(sample_data(PSOtmao)$tmao <= tmao_q
 
 # Factor it
 sample_data(PSOtmao)$tmao_quantile = factor(sample_data(PSOtmao)$tmao_quantile)
+
+# Add TMAO tertiles
+tmao_tertile <- quantile(sample_data(PSOtmao)$tmao, c(0:3/3))
+sample_data(PSOtmao)$tmao_tertile <- ifelse(sample_data(PSOtmao)$tmao <= tmao_tertile[2], "Tertile1",
+                             ifelse(sample_data(PSOtmao)$tmao > tmao_tertile[2] & sample_data(PSOtmao)$tmao <= tmao_tertile[3], "Tertile2", "Tertile3"))
+# Factor it
+sample_data(PSOtmao)$tmao_tertile = factor(sample_data(PSOtmao)$tmao_tertile)
+# Lookss good
+table(sample_data(PSOtmao)$tmao_tertile)
 ```
 
 # Preproccess
 
-Table of read counts at the Phylum level. We will filter low abundant Phyla. We will also require that taxa are present in at least 20% of samples (at least 71 samples) and occur at least 1000 times. We will then agglomerate at the Genus level. 
+Table of read counts at the Phylum level. We will filter low abundant Phyla. We will also require that taxa are present in at least 10% of samples (at least 36 samples). We will then agglomerate at the Genus level. 
 
-```{r Tables to Guide Supervised Filtering}
+```{r Getting Familiar with Taxa Distributions}
 print("The number of different bacteria at each phyla:")
 table(tax_table(PSOtmao)[, "Phylum"])
 
@@ -93,24 +102,22 @@ print("Table showing mean prevalencce and total prevalence per Phylum:")
 plyr::ddply(prevdf, "Phylum", function(df_mb){cbind("Mean" = mean(df_mb$Prevalence),"Sum" = sum(df_mb$Prevalence))})
 
 ```
-From the phylum table, we can see that p__Elusimicrobia, p__Spirochaetes, and p__Synergistetes have the same mean and sum, meaning they are only present in 1 sample. We are interested and confident in the more abundant taxa so manually filterr them out.
+From the phylum table, we can see that p__Elusimicrobia, p__Spirochaetes, and p__Synergistetes have the same mean and sum, meaning they are only present in 1 sample. We are interested and confident in the more abundant taxa so manually filter them out. Per Dr. Kable's expert advice, she already filtered to 2% prevalence to remove technical error. We will increase the filtering to 5%, a common threshold in the literature. 
 
-```{r Supervised Filtering}
-# Phylum that only occur 1 time may be artifcats. We can remove them.
-filterPhyla <- c(" p__Elusimicrobia", " p__Spirochaetes", " p__Synergistetes") # note, our taxa table has these awful hidden spaces!
+```{r Supervised Filtering 5%}
+# Define prevalence threshold as 5% of total samples
+prevalenceThreshold <- 0.05 * nsamples(PSOtmao)
+cat("The 10% prevalence threshold is", prevalenceThreshold, "samples.", "\n")
 
-# Subset
-PSOtmao1 = subset_taxa(PSOtmao, !Phylum %in% filterPhyla)
+# Execute prevalence filter, using `prune_taxa()` function
+keepTaxa = rownames(prevdf)[(prevdf$Prevalence >= prevalenceThreshold)]
+PSOtmao1 = prune_taxa(keepTaxa, PSOtmao)
 
-# View
-cat("The Phyla present after this step of subsetting includes:", "\n")
+print("The number of different bacteria at each phyla:")
 table(tax_table(PSOtmao1)[, "Phylum"])
 
-# Subset to the remaining phyla
-prevdf1 = subset(prevdf, Phylum %in% get_taxa_unique(PSOtmao1, "Phylum"))
-
 # Look at phylum level distributions
-ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1),color=Phylum)) +
+ggplot(prevdf, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1),color=Phylum)) +
   geom_hline(yintercept = 0.05, alpha = 0.5, linetype = 2) +  # Include a guess for parameter
   geom_point(size = 2, alpha = 0.7) +
   scale_x_log10() +  
@@ -119,50 +126,36 @@ ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1),color=Phylum
   facet_wrap(~Phylum) + 
   theme(legend.position="none")
 
-# Define prevalence threshold as 20% of total samples
-prevalenceThreshold = 0.20 * nsamples(PSOtmao1)
-cat("The 20% prevalence threshold is", prevalenceThreshold, "samples.", "\n")
-
-# Execute prevalence filter, using `prune_taxa()` function
-keepTaxa = rownames(prevdf1)[(prevdf1$Prevalence >= prevalenceThreshold)]
-PSOtmao2 = prune_taxa(keepTaxa, PSOtmao1)
-
-cat("Which taxa have less than 1000 counts accross all samples?", "\n")
-which(!rowSums(otu_table(PSOtmao2)) > 1000) # 6 OTUS
-# Remove these to see if that cleans ordination
-PSOtmao3 <- prune_taxa(rowSums(otu_table(PSOtmao2)) >= 1000, PSOtmao2)
-
 # Agglomerate taxa
-PSOtmao3G = tax_glom(PSOtmao3, "Genus", NArm = TRUE)
+PSOtmao1G = tax_glom(PSOtmao1, "Genus", NArm = TRUE)
 ```
 
 Great. Do your due diligence and inspect each phyloseq object to see how the filtering and glomming steps changed the nubmer of taxonomy. 
 
 ```{r Phyloseq object inspection}
 # Inspect the effect of each filtering step on the phyloseq object
+PSOtmao
 PSOtmao1
-PSOtmao2
-PSOtmao3
-PSOtmao3G
+PSOtmao1G
 ```
 
 Look at Genus level distributions of the bugs.
 
 ```{r Genus level distributions}
 # Prevalence - how many samples the taxa is observed in
-prevdf = apply(X = otu_table(PSOtmao3G),
-               MARGIN = ifelse(taxa_are_rows(PSOtmao3G), yes = 1, no = 2),
+prevdf = apply(X = otu_table(PSOtmao1G),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1G), yes = 1, no = 2),
                FUN = function(x){sum(x > 0)})
 
 prevdf = data.frame(Prevalence = prevdf,
-                    TotalAbundance = taxa_sums(PSOtmao3G), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
-                    tax_table(PSOtmao3G))
+                    TotalAbundance = taxa_sums(PSOtmao1G), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1G))
 
 print("Table showing prevalence, total abundance, and taxonomy:")
 prevdf[1:10,]
 
 # Family
-ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao3G),color=Family)) +
+ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1G),color=Family)) +
   geom_hline(yintercept = 0.05, alpha = 0.5, linetype = 2) + # Include a guess for parameter
   geom_point(size = 1, alpha = 0.7) +
   scale_x_log10() +
@@ -172,7 +165,7 @@ ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao3G),color=Famil
   theme(legend.position="none")
 
 # Genus - have to blow it up to make it useful
-ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao3G),color=Genus)) +
+ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1G),color=Genus)) +
   geom_hline(yintercept = 0.05, alpha = 0.5, linetype = 2) + # Include a guess for parameter
   geom_point(size = 1, alpha = 0.7) +
   scale_x_log10() +
@@ -187,11 +180,11 @@ ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao3G),color=Genus
 We want to identify outlier taxa that might drive the statistical analyses. One way to do this is to look for outliers in the PCoA plot.
 
 ```{r PCoA for outliers}
-PCoA_BC <- ordinate(PSOtmao3G, "PCoA", "bray")
+PCoA_BC <- ordinate(PSOtmao1G, "PCoA", "bray")
 
 # BC
 # taxa is similar to species
-taxa_plot <- plot_ordination(PSOtmao3G, PCoA_BC, type = "taxa")
+taxa_plot <- plot_ordination(PSOtmao1G, PCoA_BC, type = "taxa")
 taxa_plot
 # It looks like there is an outlier in the top left corner of the plot. 
 # Identify which taxa that bacteria is from and remove it. 
@@ -200,56 +193,29 @@ plot(tp_data$Axis.2) # yes an outlier!
 # Who is it?
 outlier <- tp_data[tp_data$Axis.2 == max(tp_data$Axis.2), ] 
 cat("Which genus is the outlier?", outlier$Genus, "\n")
-
-# Remove it
-filterGenus <- c(" g__Prevotella") # note, our taxa table has these awful hidden spaces!
-
-# Subset 
-PSOtmao4G = subset_taxa(PSOtmao3G, !Genus %in% filterGenus)
-
-# Replot:
-PCoA_BC2 <- ordinate(PSOtmao4G, "PCoA", "bray")
-
-# BC Round 2
-# taxa is similar to species
-taxa_plot2 <- plot_ordination(PSOtmao4G, PCoA_BC2, type = "taxa")
-taxa_plot2
-
-# samples is similar to sites
-plot_ordination(PSOtmao4G, PCoA_BC2, type = "samples", color = "age") 
-
-# Which taxa have less than 1000 counts?
-which(!rowSums(otu_table(PSOtmao4G)) > 1000) # none, good
-
 ```
 
-View the phyloseq objects again. We see that the most dramatic effect was when we filtered for phyla present in 20% of samples (PSOtmao1 to 2).
-
-```{r Compare PSOs again}
-PSOtmao
-PSOtmao1
-PSOtmao2
-PSOtmao3
-PSOtmao3G
-PSOtmao4G
-```
+Super interesting! The "outlier" is prevotella, which is interesting in the microbiome community as a marker of individuals who consume/live/have non-industrialized diets/environments/guts. We won't remove this bug afterall. 
 
 Save
 
 ```{r save PSOtmao4G}
-save(PSOtmao4G, file = "../../data/processed/microbiome/phyloseq_objects/PSOtmao4G_211111.RData")
+save(PSOtmao1, file = "../../data/processed/microbiome/phyloseq_objects/PSOtmao1_211118.RData")
+save(PSOtmao1G, file = "../../data/processed/microbiome/phyloseq_objects/PSOtmao1G_211118.RData")
 ```
 
 # Phylogenetic Abundance plots
 
+## Family Plot of TMAO Quantile 
+
 ```{r Phylo Abundance Plot by TMAO Quantile}
 # Agglomerate taxa
-PSOtmao3F = tax_glom(PSOtmao3, "Family", NArm = TRUE)
-PSOtmao3F.top10 <- microbiome::aggregate_top_taxa(PSOtmao3, "Family", top = 10)
+PSOtmao1F = tax_glom(PSOtmao1, "Family", NArm = TRUE)
+PSOtmao1F.top10 <- microbiome::aggregate_top_taxa(PSOtmao1F, "Family", top = 10)
 
-ps3F.10.family.comp <- microbiome::transform(PSOtmao3F.top10, transform="compositional")
+ps1F.10.family.comp <- microbiome::transform(PSOtmao1F.top10, transform="compositional")
 
-plot.composition.relAbun <- microbiome::plot_composition(ps3F.10.family.comp,
+plot.composition.relAbun <- microbiome::plot_composition(ps1F.10.family.comp,
                                              sample.sort = "Description",
                                              x.label = "tmao_quantile",
                                              group_by = "tmao_quantile",
@@ -259,7 +225,31 @@ plot.composition.relAbun <- microbiome::plot_composition(ps3F.10.family.comp,
   ggtitle("Relative Abundance at Family Level")
 
 plot.composition.relAbun
+```
 
+## Family Plot of TMAO Tertile 
+
+```{r Tertiles}
+# Agglomerate taxa
+PSOtmao1F = tax_glom(PSOtmao1, "Family", NArm = TRUE)
+PSOtmao1F.top10 <- microbiome::aggregate_top_taxa(PSOtmao1F, "Family", top = 10)
+ps1F.10.family.comp <- microbiome::transform(PSOtmao1F.top10, transform="compositional")
+
+plot.composition.relAbun <- microbiome::plot_composition(ps1F.10.family.comp,
+                                             sample.sort = "Description",
+                                             x.label = "tmao_tertile",
+                                             group_by = "tmao_tertile",
+                                             average_by = "tmao_tertile") +
+  theme_minimal() +
+  scale_fill_brewer("Family", palette = "Paired") + 
+  ggtitle("Relative Abundance at Family Level")
+
+plot.composition.relAbun
+
+# Save
+jpeg("../../Outputs/plots/microbiome/RelAbund_Fam_TMAOTertiles_2111.jpg", width = 4, height = 4, res = 300)
+plot.composition.relAbun
+dev.off()
 ```
 
 
