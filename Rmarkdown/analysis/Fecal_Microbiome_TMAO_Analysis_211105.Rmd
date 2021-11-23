@@ -28,6 +28,7 @@ output:
 
 1) [Example using Negative Binomial in Microbiome Differential Abundance Testing](https://bioconductor.org/packages/devel/bioc/vignettes/phyloseq/inst/doc/phyloseq-mixture-models.html)
 2) [Workflow for Microbiome Data Analysis: from raw reads to community analyses](https://bioconductor.org/help/course-materials/2017/BioC2017/Day1/Workshops/Microbiome/MicrobiomeWorkflowII.html#different_ordination_projections)
+3) [Example of what descriptive microbiome stats to report in the results](https://pubmed.ncbi.nlm.nih.gov/28407784/)
 
 
 # Set Up
@@ -257,29 +258,94 @@ dev.off()
 
 From the DESeq2 [documentation](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html), "Note: In order to benefit from the default settings of the package, you should put the variable of interest at the end of the formula and make sure the control level is the first level."
 
-```{r DESeq2 analysis}
+From Dr. Kable's example, 
+
+> # Test the impact of fiber cluster, accounting for covariates, using the log ratio test
+dds.ratio.batcho = phyloseq_to_deseq2(ps.genus, ~ Batch + k4_cluster)
+>
+> # This performs a likelihood ratio test, which determines if the increased likelihood of the data in the full model, where we include all terms, is more than expected if the terms excluded in the reduced model are really zero. 
+dds.ratio.batcho <- DESeq(dds.ratio.batcho, test="LRT", reduced = ~ Batch )
+>
+> # The p-value is based on the LRT (so the same for everything), but the contrasts give the right log2 fold change.
+resultsNames(dds.ratio.batcho)
+res.1v2.batcho <- results(dds.ratio.batcho, contrast=c("k4_cluster", "2", "1"))
+
+## Factored by TMAO Median 
+```{r DESeq2 analysis - TMAO median}
 # Grab the sample data to easily check the structure of your covariates, age, sex, and BMI
-sd <- sample_data(PSOtmao4G)
+sd <- sample_data(PSOtmao1G)
 str(sd$sex)
 str(sd$bmi_final.x)
 # Factor sex, BMI okay
-sample_data(PSOtmao4G)$sex = factor(sample_data(PSOtmao4G)$sex)
+sample_data(PSOtmao1G)$sex = factor(sample_data(PSOtmao1G)$sex)
 
+#~~~~~~~~~~~~~~~
 # DESeq analysis
-mb <- phyloseq_to_deseq2(PSOtmao4G, ~ sex:age + bmi_final.x + tmao_mdn)
-#mb2 <- estimateSizeFactors(mb, type="poscount")
-mb3 = DESeq(mb, test="Wald", fitType="parametric")
-
-# Results
-res = results(mb3, cooksCutoff = FALSE)
+# TMAO median
+#~~~~~~~~~~~~~~~
+mb <- phyloseq_to_deseq2(PSOtmao1G, ~ sex + age + bmi_final.x + tmao_mdn)
+mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remove variable of interest here, TMAO
+res.ratio <- results(mb.ratio)
 alpha = 0.05
-sigtab = res[which(res$padj < alpha), ]
-sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao4G)[rownames(sigtab), ], "matrix"))
+alpha.big = 0.5
+sigtab = res.ratio[which(res.ratio$padj < alpha.big), ]
+sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao1G)[rownames(sigtab), ], "matrix"))
 sigtab$family_genus <- paste0(sigtab$Family, sigtab$Genus)
 head(sigtab)
+
 ```
 
-```{r Plot DESeq2 results}
+No results when we look at TMAO median and control for age, sex, and BMI.
+
+## Factored by TMAO Tertile 
+
+```{r DESeq2 analysis - TMAO tertile}
+
+# DESeq analysis - tmao_tertile
+mb <- phyloseq_to_deseq2(PSOtmao1G, ~ sex + age + bmi_final.x + tmao_tertile)
+mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remove variable of interest here, TMAO
+res.ratio <- results(mb.ratio, contrast = c("tmao_tertile", "Tertile1", "Tertile3")) # Look at most different tertiles
+alpha = 0.05
+sigtab = res.ratio[which(res.ratio$padj < alpha), ]
+sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao1G)[rownames(sigtab), ], "matrix"))
+sigtab$family_genus <- paste0(sigtab$Family, sigtab$Genus)
+head(sigtab)
+
+#~~~~~~~~~~~~~~~
+# Plot Results
+#~~~~~~~~~~~~~~~
+resOTU <- rownames(sigtab)
+otuData <- as.data.frame(otu_table(PSOtmao1G))
+otuData_desRes <- otuData[rownames(otuData) %in% resOTU,]
+#otuData_desRes <- as.data.frame(t(otuData_desRes))
+# Get sample data groupings
+sampleData <- as.data.frame(sample_data(PSOtmao1G))
+sampleData <- subset(sampleData, select = c(tmao_mdn, tmao_quantile, tmao_tertile, tmao))
+# Get tax table
+taxaData <- as.data.frame(tax_table(PSOtmao1G))
+taxaData_res <- taxaData[rownames(taxaData) %in% resOTU,]
+taxaData_res$OrderFamilyGenus <- paste0(taxaData_res$Order, taxaData_res$Family, taxaData_res$Genus)
+
+# Merge
+ggData <- merge(taxaData_res, otuData_desRes, by = 0)
+rownames(ggData) <-  ggData$OrderFamilyGenus
+ggData <- ggData[,-(1:9)]
+ggData <- as.data.frame(t(ggData))
+ggData <- merge(ggData, sampleData, by = 0)
+rownames(ggData) <- ggData[,"Row.names"]
+ggData <- subset(ggData, select = -c(Row.names))
+
+# Loop Plot
+nres <- length(resOTU)
+for (i in 1:nres) { 
+    print(ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
+            geom_boxplot()+
+            ylab(colnames(ggData)[i])) 
+}
+
+#~~~~~~~~~~~~~~~
+# Plot Results Fold Change
+#~~~~~~~~~~~~~~~
 sigtabgen = subset(sigtab, !is.na(Genus))
 # Phylum order
 x = tapply(sigtabgen$log2FoldChange, sigtabgen$Phylum, function(x) max(x))
@@ -299,107 +365,116 @@ ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) +
   theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
 ```
 
-# Alpha Diversity Analysis
+## Factored by TMAO Quantile 
 
-We need to recalculate the alpha diversity metrics now that we have removed and glommed the taxa data. Note, by recalculating these metrics we don't want to use measures that count singletons (Chao1, ACE) because we purposefully removed those occurences! By redoing the metrics we are asking, "At the Genus level, is within diversity (richness, evenness, or a combination depending on the statistical test) different?"
+```{r DESeq2 analysis - TMAO quantile}
+# DESeq analysis - tmao_quantile
+mb <- phyloseq_to_deseq2(PSOtmao1G, ~ sex + age + bmi_final.x + tmao_quantile)
+mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remove variable of interest here, TMAO
+res.ratio <- results(mb.ratio, contrast = c("tmao_quantile", "Quantile1", "Quantile4"))
+alpha = 0.05
+sigtab = res.ratio[which(res.ratio$padj < alpha), ]
+sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao1G)[rownames(sigtab), ], "matrix"))
+sigtab$family_genus <- paste0(sigtab$Family, sigtab$Genus)
+head(sigtab)
 
-```{r Update alpha statistics}
-#plot_richness(PSOtmao4, x="tmao_mdn", color="bmi_cat", measures=c("Chao1", "Shannon"))
+#~~~~~~~~~~~~~~~
+# Plot Results
+#~~~~~~~~~~~~~~~
+resOTU <- rownames(sigtab)
+otuData <- as.data.frame(otu_table(PSOtmao1G))
+otuData_desRes <- otuData[rownames(otuData) %in% resOTU,]
+#otuData_desRes <- as.data.frame(t(otuData_desRes))
+# Get sample data groupings
+sampleData <- as.data.frame(sample_data(PSOtmao1G))
+sampleData <- subset(sampleData, select = c(tmao_mdn, tmao_quantile, tmao_tertile, tmao))
+# Get tax table
+taxaData <- as.data.frame(tax_table(PSOtmao1G))
+taxaData_res <- taxaData[rownames(taxaData) %in% resOTU,]
+taxaData_res$OrderFamilyGenus <- paste0(taxaData_res$Order, taxaData_res$Family, taxaData_res$Genus)
 
-# Recalculate alpha diversity now that some taxonomy have been filtered out
-updated_alpha <- estimate_richness(PSOtmao4G)
-row.names(updated_alpha) <- gsub("X", "", row.names(updated_alpha))
+# Merge
+ggData <- merge(taxaData_res, otuData_desRes, by = 0)
+rownames(ggData) <-  ggData$OrderFamilyGenus
+ggData <- ggData[,-(1:9)]
+ggData <- as.data.frame(t(ggData))
+ggData <- merge(ggData, sampleData, by = 0)
+rownames(ggData) <- ggData[,"Row.names"]
+ggData <- subset(ggData, select = -c(Row.names))
+
+# Loop Plot
+nres <- length(resOTU)
+for (i in 1:nres) { 
+    print(ggplot(ggData, aes(x = tmao_quantile, y = log(ggData[,i]))) +
+            geom_boxplot()+
+            ylab(colnames(ggData)[i])) 
+}
+
+#~~~~~~~~~~~~~~~
+# Plot Results Fold Change
+#~~~~~~~~~~~~~~~
+sigtabgen = subset(sigtab, !is.na(Genus))
+# Phylum order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Phylum, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Phylum = factor(as.character(sigtabgen$Phylum), levels=names(x))
+# Genus order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Genus, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Genus = factor(as.character(sigtabgen$Genus), levels=names(x))
+ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) + 
+  geom_vline(xintercept = 0.0, color = "gray", size = 0.5) +
+  geom_point(size=3) + 
+  ylab("Taxonomy") +
+  xlab("Log2 Fold Change") + 
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
 ```
 
-First, load the master phenotype file so that we can have complete access to our covariate variables. Merge the master phenotyp file with the sample data from the phyloseq object.
 
-```{r Alpha diversity load data}
+# Alpha Diversity Analysis
+
+We do not need to redo the alpha diversity calculations because the filtering we did was not to remove technical variation but instead to focus our analysis on the more common players (also so we can be more statistically confident using less scarce data). Note, if you did want to calculate alpha diversity, the command estimate_richness() can accomplish that for you. 
+
+Check the distributions of the alpha diversity metrics and run the multiple linear regression models with covariates. 
+
+```{r Original Alpha diversity stats}
 # Load master pheno file
 phen <- readRDS("../../data/processed/phenotype/Phenotypes_211108.rds")
 phen <- subset(phen, select = -c(sex, age, age_cat, bmi_cat))
 
-# Check bin structure and factor if needed
-#str(phen$age_cat)
-#phen$age_cat <- as.factor(phen$age_cat)
-#str(phen$bmi_cat)phen$bmi_cat <- as.factor(phen$bmi_cat)
-
 # Grab PSO sample data
-df <- as(sample_data(PSOtmao4G), "data.frame")
-
+df <- as(sample_data(PSOtmao1G), "data.frame")
 # Merge
 df2 <- merge(phen, df, by = 0)
 row.names(df2) <- df2[,"Row.names"]
 df2 <- subset(df2, select =-c(Row.names))
 
-# Merge updated alpha
-df_alpha2 <- merge(updated_alpha, df2, by = 0)
-row.names(df_alpha2) <- df_alpha2[,"Row.names"]
-df_alpha2 <- subset(df_alpha2, select =-c(Row.names))
+#~~~~~~~~~~~~~~~~
+# Compute
+#~~~~~~~~~~~~~~~~
 
-# Original alpha
-summary(lm(shannon ~ tmao_log + sex*age + cystatinc_bd1, df2))
-# Updated alpha
-summary(lm(df_alpha2$Shannon ~ tmao_log + sex*age + cystatinc_bd1, df_alpha2))
-```
-
-Check the distributions of the alpha diversity metrics and run the multiple linear regression models. 
-
-```{r Original Alpha diversity stats}
 # Check distribution
 shapiro.test(df2$shannon) # not normal, proceed with caution
 shapiro.test(log(df2$shannon))
 # Run linear regression
-summary(lm(shannon ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
+summary(lm(tmao_log ~ shannon + sex*age + cystatinc_bd1, df2))
 
 # Check distribution
 shapiro.test(df2$faith_pd) # normal
 # Run linear regression
-summary(lm(faith_pd ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
+summary(lm(tmao_log ~ faith_pd + sex*age + cystatinc_bd1, df2))
 
 # Check distribution
 shapiro.test(df2$pielou_e) # not normal, proceed with caution
 # Run linear regression
-summary(lm(pielou_e ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
+summary(lm(tmao_log ~ pielou_e + sex*age + cystatinc_bd1, df2))
 
 # Check distribution
 shapiro.test(df2$observed_otus) # normal
 # Run linear regression
-summary(lm(observed_otus ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
-```
-
-```{r Updated Alpha diversity stats}
-#~~~~~~~~~~~
-# Shannon
-#~~~~~~~~~~~
-# Check distribution
-shapiro.test(df_alpha2$Shannon) # not normal, proceed with caution
-shapiro.test((df_alpha2$shannon)^.5) # not better
-# Run linear regression
-summary(lm(Shannon ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
-
-#~~~~~~~~~~~
-# Fisher
-#~~~~~~~~~~~
-# Check distribution
-shapiro.test(df_alpha2$Fisher) # 
-# Run linear regression
-summary(lm(Fisher ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
-
-#~~~~~~~~~~~
-# InvSimpson
-#~~~~~~~~~~~
-# Check distribution
-shapiro.test(df_alpha2$InvSimpson) # normal
-# Run linear regression
-summary(lm(InvSimpson ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
-
-#~~~~~~~~~~~
-# Observed
-#~~~~~~~~~~~
-# Check distribution
-shapiro.test(df_alpha2$Observed) # eh not normal
-# Run linear regression
-summary(lm(Observed ~ tmao_log + sex*age + cystatinc_bd1 + ethnicity, df_alpha2))
+summary(lm(tmao_log ~ observed_otus + sex*age + cystatinc_bd1, df2))
 ```
 
 ## Alpha Diversity Plots
@@ -410,9 +485,9 @@ Make plots that demonstrate the relationship between TMAO and the alpha-diversit
 # Shannon
 y_variable <- "Shannon"
 x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
+mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=shannon)) +
+ggplot(df2, aes(x=tmao_log, y=shannon)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -425,9 +500,9 @@ ggplot(df_alpha2, aes(x=tmao_log, y=shannon)) +
 # Faith's Phylogenetic Diversity
 y_variable <- "Faith's Phylogenetic Diversity"
 x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
+mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=faith_pd)) +
+ggplot(df2, aes(x=tmao_log, y=faith_pd)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -440,9 +515,9 @@ ggplot(df_alpha2, aes(x=tmao_log, y=faith_pd)) +
 # Pielou's Evenness
 y_variable <- "Pielou's Evenness"
 x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
+mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=pielou_e)) +
+ggplot(df2, aes(x=tmao_log, y=pielou_e)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -455,72 +530,9 @@ ggplot(df_alpha2, aes(x=tmao_log, y=pielou_e)) +
 # Observed OTUs
 y_variable <- "Observed OTUs"
 x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
+mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=observed_otus)) +
-  geom_point(aes(shape=bmi_cat, color = age_cat)) +
-  geom_vline(xintercept = mdn_cut, linetype = "dashed") +
-  geom_smooth(method = "lm", se = FALSE, fullrange = F) +
-  theme_minimal() + 
-  ylab(y_variable) +
-  xlab(x_variable) +
-  labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
-
-```
-
-```{r Updated Alpha Diversity Plots}
-# Shannon
-y_variable <- "Shannon"
-x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
-# Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=Shannon)) +
-  geom_point(aes(shape=bmi_cat, color = age_cat)) +
-  geom_vline(xintercept = mdn_cut, linetype = "dashed") +
-  geom_smooth(method = "lm", se = FALSE, fullrange = F) +
-  theme_minimal() + 
-  ylab(y_variable) +
-  xlab(x_variable) +
-  labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
-
-# Faith's Phylogenetic Diversity
-y_variable <- "Chao1"
-x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
-# Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=Chao1)) +
-  geom_point(aes(shape=bmi_cat, color = age_cat)) +
-  geom_vline(xintercept = mdn_cut, linetype = "dashed") +
-  geom_smooth(method = "lm", se = FALSE, fullrange = F) +
-  theme_minimal() + 
-  ylab(y_variable) +
-  xlab(x_variable) +
-  labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
-
-# Pielou's Evenness
-y_variable <- "Inverse Simpson"
-x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
-# Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=InvSimpson)) +
-  geom_point(aes(shape=bmi_cat, color = age_cat)) +
-  geom_vline(xintercept = mdn_cut, linetype = "dashed") +
-  geom_smooth(method = "lm", se = FALSE, fullrange = F) +
-  theme_minimal() + 
-  ylab(y_variable) +
-  xlab(x_variable) +
-  labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
-
-# Observed OTUs
-y_variable <- "Observed OTUs"
-x_variable <- "Natural Log of TMAO (uM)"
-mdn_cut <- log(median(df_alpha2$tmao.x))
-# Plot
-ggplot(df_alpha2, aes(x=tmao_log, y=Observed)) +
+ggplot(df2, aes(x=tmao_log, y=observed_otus)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -596,7 +608,7 @@ adonis2(dismax_bc ~ tmao_log + sex:age + bmi_final.y, data=df, method = "bray", 
 source("../../Rscripts/ancom_v2.1.R")
 
 # OTU table
-MicroData <- otu_table(PSOtmao4G)
+MicroData <- otu_table(PSOtmao1G)
 MicroData <- as.data.frame(as.matrix(MicroData), stringsAsFactors = F)
 # Add 1
 #MicroData2 <- MicroData +1
@@ -608,7 +620,7 @@ MicroData <- as.data.frame(as.matrix(MicroData), stringsAsFactors = F)
 # Perform ANCOM analysis
 # Step 1: Data preprocessing
 # OTU data
-otu_data <- otu_table(PSOtmao4G)
+otu_data <- otu_table(PSOtmao1G)
 otu_data <- as.data.frame(as.matrix(otu_data), stringsAsFactors = F)
 otu_id <- rownames(otu_data)
 
@@ -616,7 +628,7 @@ otu_id <- rownames(otu_data)
 #df <- readRDS("../data_processed/mapping/Biocrates_mapping_BD1_210809.rds")
 #df$p.Cresol.SO4_bd1_mdn <- plyr::revalue(df$p.Cresol.SO4_bd1_mdn, c("0" = "< Median", "1" = "> Median"))
 # Subset
-MetaData2 <- df_alpha2 %>% dplyr::select(c(tmao_mdn, age, sex, bmi_final))
+MetaData2 <- df2 %>% dplyr::select(c(tmao_mdn, age, sex, bmi_final))
 MetaData2$Sample.ID <- rownames(MetaData2)
 
 
@@ -743,13 +755,14 @@ p
 
 
 ## ANCOM2 covariate analysis
+
 ANCOM2 lets you include covariates into the analysis. If we add the same covariates as in the DESeq2 analysis, do we get similar results? 
 
-```{r ANCOM - genus level with covariates}
+```{r ANCOM - genus level with covariates median}
 source("../../Rscripts/ancom_v2.1.R")
 
 # OTU table
-MicroData <- otu_table(PSOtmao4G)
+MicroData <- otu_table(PSOtmao1G)
 MicroData <- as.data.frame(as.matrix(MicroData), stringsAsFactors = F)
 # Add 1
 #MicroData2 <- MicroData +1
@@ -761,7 +774,7 @@ MicroData <- as.data.frame(as.matrix(MicroData), stringsAsFactors = F)
 # Perform ANCOM analysis
 # Step 1: Data preprocessing
 # OTU data
-otu_data <- otu_table(PSOtmao4G)
+otu_data <- otu_table(PSOtmao1G)
 otu_data <- as.data.frame(as.matrix(otu_data), stringsAsFactors = F)
 otu_id <- rownames(otu_data)
 
@@ -769,7 +782,7 @@ otu_id <- rownames(otu_data)
 #df <- readRDS("../data_processed/mapping/Biocrates_mapping_BD1_210809.rds")
 #df$p.Cresol.SO4_bd1_mdn <- plyr::revalue(df$p.Cresol.SO4_bd1_mdn, c("0" = "< Median", "1" = "> Median"))
 # Subset
-MetaData2 <- df_alpha2 %>% dplyr::select(c(tmao_mdn, age, sex, bmi_final))
+MetaData2 <- df2 %>% dplyr::select(c(tmao_mdn, age, sex, bmi_final))
 MetaData2$Sample.ID <- rownames(MetaData2)
 
 
@@ -894,5 +907,160 @@ p <- ggplot(data = ggData2,
 p
 ```
 
+Repeat looking at tertile 1 and 3. This section isn't currently working but I'm not sure why. 
+
+```{r ANCOM - genus level with covariates tertile}
+source("../../Rscripts/ancom_v2.1.R")
+
+# OTU table
+MicroData <- otu_table(PSOtmao1G)
+MicroData <- as.data.frame(as.matrix(MicroData), stringsAsFactors = F)
+# Add 1
+#MicroData2 <- MicroData +1
+#MicroData2 <- as.data.frame(as.matrix(t(MicroData2),stringsAsFactors = F))
+#dim(MicroData2) # 103 x 98
+
+# Load the phenotype data
+#------------------------
+# Perform ANCOM analysis
+# Step 1: Data preprocessing
+# OTU data
+otu_data <- otu_table(PSOtmao1G)
+otu_data <- as.data.frame(as.matrix(otu_data), stringsAsFactors = F)
+otu_id <- rownames(otu_data)
+
+# Metadata 
+#df <- readRDS("../data_processed/mapping/Biocrates_mapping_BD1_210809.rds")
+#df$p.Cresol.SO4_bd1_mdn <- plyr::revalue(df$p.Cresol.SO4_bd1_mdn, c("0" = "< Median", "1" = "> Median"))
+# Subset
+MetaData2 <- df2 %>% dplyr::select(c(tmao_mdn, age, sex, bmi_final))
+MetaData2$Sample.ID <- rownames(MetaData2)
+
+
+feature_table = otu_data; sample_var = "Sample.ID"; group_var = NULL
+out_cut = 0.05; zero_cut = 0.95; lib_cut = 1000; neg_lb = FALSE # make zero_cut=0.95 to match criteria used for other metabolites
+# Function
+prepro = feature_table_pre_process(feature_table = feature_table,
+                                   meta_data = MetaData2,
+                                   sample_var = sample_var,
+                                   group_var = NULL,
+                                   out_cut = out_cut,
+                                   zero_cut = zero_cut,
+                                   lib_cut = lib_cut,
+                                   neg_lb = neg_lb)
+
+# Step 2: ANCOM
+feature_table = prepro$feature_table 
+meta_data = prepro$meta_data
+struc_zero = prepro$structure_zeros
+
+# Step 2.1: Tertile 1 and 3
+tert1_3 <- df2[df2$tmao_tertile == "Tertile1" | df2$tmao_tertile == "Tertile3",]
+feature_table = feature_table[,colnames(feature_table) %in% rownames(tert1_3)]
+meta_data = meta_data[rownames(meta_data) %in% rownames(tert1_3),]
+
+# Define variables for ANCOM
+main_var = "tmao_tertile"; p_adj_method = "BH"; alpha = 0.05
+adj_formula = c("age + sex + bmi_final"); rand_formula = NULL
+# Run ANCCOM
+t_start = Sys.time()
+res = ANCOM(feature_table = feature_table, 
+            meta_data = meta_data, 
+            struc_zero = struc_zero, 
+            main_var = main_var, 
+            p_adj_method = p_adj_method, 
+            alpha = alpha, 
+            adj_formula = adj_formula, 
+            rand_formula = rand_formula)
+t_end = Sys.time()
+t_run = t_end - t_start 
+t_run # around 5s
+
+# Results
+res$out
+res$fig$data
+
+# Step 3: Volcano Plot
+# Number of taxa except structural zeros
+n_taxa = ifelse(is.null(struc_zero), nrow(feature_table), sum(apply(struc_zero, 1, sum) == 0))
+# Cutoff values for declaring differentially abundant taxa
+cut_off = c(0.9 * (n_taxa -1), 0.8 * (n_taxa -1), 0.7 * (n_taxa -1), 0.6 * (n_taxa -1))
+names(cut_off) = c("detected_0.9", "detected_0.8", "detected_0.7", "detected_0.6")
+
+# Annotation data
+dat_ann = data.frame(x = min(res$fig$data$x), y = cut_off["detected_0.7"], label = "W[0.7]")
+
+fig = res$fig +  
+  geom_hline(yintercept = cut_off["detected_0.7"], linetype = "dashed") + 
+  geom_text(data = dat_ann, aes(x = x, y = y, label = label), 
+            size = 4, vjust = -0.5, hjust = 0, color = "orange", parse = TRUE)
+fig  
+
+# ORGANIZE PLOT
+
+TaxaData2 <- readRDS("../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.rds")
+rownames(TaxaData2) <- TaxaData2$Feature.ID
+
+ancomRes <- res$out
+
+test <- merge(ancomRes, TaxaData2, by.x = "taxa_id", by.y = "Feature.ID", all.x = TRUE, all.y = FALSE)
+
+# Make plot 
+tempdata <- test[test$detected_0.6 == TRUE,] # 0.6 but can make 0.7
+asv_id <- unique(tempdata$taxa_id)
+
+MicroData4 <- feature_table[row.names(feature_table) %in% asv_id,]
+
+# Rename to the taxonomy 
+#MicroData5 <- as.data.frame(as.matrix(t(MicroData4)))
+TaxaData3 <- TaxaData2 %>% dplyr::select(Order, Family, Genus)
+# Make a unique naming column that incorporates multiple levels of taxonomy
+TaxaData3$OrderFamilyGenus <- paste(TaxaData3$Order, TaxaData3$Family, TaxaData3$Genus)
+rownames(TaxaData3) <- rownames(TaxaData2)
+# Merge
+MicroData5 <- merge(MicroData4, TaxaData3,
+                    by=0, all.x = T, all.y = F)
+
+row.names(MicroData5) <- MicroData5$OrderFamilyGenus
+
+MicroData5 <- MicroData5 %>%  dplyr::select(-Order, -Family, -Genus, -OrderFamilyGenus, -Row.names)
+MicroData5 <- as.data.frame(as.matrix(t(MicroData5)))
+
+# Merge with the phenotype data 
+MetaData3 <- MetaData2 %>% dplyr::select(tmao_tertile)
+
+ggData <- merge(MetaData3, MicroData5, by =0)
+row.names(ggData) <- ggData$Row.names
+ggData <- ggData %>% dplyr::select(-Row.names)
+
+# Gather the data
+library(tidyr)
+ggData2 <- gather(ggData,
+                  key = "Taxa",
+                  value = "Abundance",
+                  -tmao_tertile)
+                
+ggData2$Abundance <- log(ggData2$Abundance)
+
+# Plot it
+p <- ggplot(data = ggData2,
+            aes(x = Taxa, 
+                y = Abundance,
+                fill = tmao_tertile), 
+            alpha = 0.1) +
+  geom_boxplot(lwd=.25) +
+  xlab(NULL) +
+  ylab("Log of Taxa Abundance") +
+  theme_bw() + # note order matters here - need bw to be before theme()
+  theme(axis.text.y = element_text( hjust = 1),
+        axis.text.x = element_text(angle = 60, hjust = 1),
+        text=element_text(size=11))  +
+  scale_fill_manual(values=c("#2D708EFF", "#B8DE29FF")) + 
+  #scale_fill_viridis(discrete = TRUE) +
+  #coord_flip() +
+  labs(fill = "TMAO \n Classification")
+
+p
+```
 
 
