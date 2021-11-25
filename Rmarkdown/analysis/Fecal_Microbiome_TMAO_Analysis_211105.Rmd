@@ -55,6 +55,9 @@ sample_data(PSOtmao)$bmi_cat <- ifelse(sample_data(PSOtmao)$bmi_final.x < 25, 1,
                          ifelse(sample_data(PSOtmao)$bmi_final.x >= 25 & sample_data(PSOtmao)$bmi_final.x < 30, 2, 3))
 sample_data(PSOtmao)$bmi_cat <- as.factor(sample_data(PSOtmao)$bmi_cat)
 
+# Factor sex, BMI okay
+sample_data(PSOtmao)$sex = factor(sample_data(PSOtmao)$sex)
+
 # Make sure "below" is the reference factor
 str(sample_data(PSOtmao)$tmao_mdn)
 sample_data(PSOtmao)$tmao_mdn <- relevel(sample_data(PSOtmao)$tmao_mdn, ref = "below")
@@ -105,7 +108,7 @@ plyr::ddply(prevdf, "Phylum", function(df_mb){cbind("Mean" = mean(df_mb$Prevalen
 ```
 From the phylum table, we can see that p__Elusimicrobia, p__Spirochaetes, and p__Synergistetes have the same mean and sum, meaning they are only present in 1 sample. We are interested and confident in the more abundant taxa so manually filter them out. Per Dr. Kable's expert advice, she already filtered to 2% prevalence to remove technical error. We will increase the filtering to 5%, a common threshold in the literature. 
 
-```{r Supervised Filtering 5%}
+```{r Supervised Filtering 0.05}
 # Define prevalence threshold as 5% of total samples
 prevalenceThreshold <- 0.05 * nsamples(PSOtmao)
 cat("The 10% prevalence threshold is", prevalenceThreshold, "samples.", "\n")
@@ -131,7 +134,7 @@ ggplot(prevdf, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1),color=Phylum)
 PSOtmao1G = tax_glom(PSOtmao1, "Genus", NArm = TRUE)
 ```
 
-Great. Do your due diligence and inspect each phyloseq object to see how the filtering and glomming steps changed the nubmer of taxonomy. 
+Great. Do your due diligence and inspect each phyloseq object to see how the filtering and glomming steps changed the number of taxonomy. 
 
 ```{r Phyloseq object inspection}
 # Inspect the effect of each filtering step on the phyloseq object
@@ -156,7 +159,7 @@ print("Table showing prevalence, total abundance, and taxonomy:")
 prevdf[1:10,]
 
 # Family
-ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1G),color=Family)) +
+ggplot(prevdf, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1G),color=Family)) +
   geom_hline(yintercept = 0.05, alpha = 0.5, linetype = 2) + # Include a guess for parameter
   geom_point(size = 1, alpha = 0.7) +
   scale_x_log10() +
@@ -166,7 +169,7 @@ ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1G),color=Famil
   theme(legend.position="none")
 
 # Genus - have to blow it up to make it useful
-ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1G),color=Genus)) +
+ggplot(prevdf, aes(TotalAbundance, Prevalence / nsamples(PSOtmao1G),color=Genus)) +
   geom_hline(yintercept = 0.05, alpha = 0.5, linetype = 2) + # Include a guess for parameter
   geom_point(size = 1, alpha = 0.7) +
   scale_x_log10() +
@@ -260,25 +263,22 @@ From the DESeq2 [documentation](https://bioconductor.org/packages/release/bioc/v
 
 From Dr. Kable's example, 
 
-> # Test the impact of fiber cluster, accounting for covariates, using the log ratio test
-dds.ratio.batcho = phyloseq_to_deseq2(ps.genus, ~ Batch + k4_cluster)
+> DESeq2 Set Up
+> Test the impact of fiber cluster, accounting for covariates, using the log ratio test
 >
-> # This performs a likelihood ratio test, which determines if the increased likelihood of the data in the full model, where we include all terms, is more than expected if the terms excluded in the reduced model are really zero. 
-dds.ratio.batcho <- DESeq(dds.ratio.batcho, test="LRT", reduced = ~ Batch )
+> dds.ratio.batcho = phyloseq_to_deseq2(ps.genus, ~ Batch + k4_cluster)
+> This performs a likelihood ratio test, which determines if the increased likelihood of the data in the full model, where we include all terms, is more than expected if the terms excluded in the reduced model are really zero. 
 >
-> # The p-value is based on the LRT (so the same for everything), but the contrasts give the right log2 fold change.
-resultsNames(dds.ratio.batcho)
-res.1v2.batcho <- results(dds.ratio.batcho, contrast=c("k4_cluster", "2", "1"))
+> dds.ratio.batcho <- DESeq(dds.ratio.batcho, test="LRT", reduced = ~ Batch )
+> 
+> The p-value is based on the LRT (so the same for everything), but the contrasts give the right log2 fold change.
+> 
+> resultsNames(dds.ratio.batcho)
+> res.1v2.batcho <- results(dds.ratio.batcho, contrast=c("k4_cluster", "2", "1"))
 
 ## Factored by TMAO Median 
-```{r DESeq2 analysis - TMAO median}
-# Grab the sample data to easily check the structure of your covariates, age, sex, and BMI
-sd <- sample_data(PSOtmao1G)
-str(sd$sex)
-str(sd$bmi_final.x)
-# Factor sex, BMI okay
-sample_data(PSOtmao1G)$sex = factor(sample_data(PSOtmao1G)$sex)
 
+```{r DESeq2 analysis - TMAO median}
 #~~~~~~~~~~~~~~~
 # DESeq analysis
 # TMAO median
@@ -300,7 +300,6 @@ No results when we look at TMAO median and control for age, sex, and BMI.
 ## Factored by TMAO Tertile 
 
 ```{r DESeq2 analysis - TMAO tertile}
-
 # DESeq analysis - tmao_tertile
 mb <- phyloseq_to_deseq2(PSOtmao1G, ~ sex + age + bmi_final.x + tmao_tertile)
 mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remove variable of interest here, TMAO
@@ -363,6 +362,11 @@ ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) +
   scale_color_brewer(palette = "Dark2") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+```
+Save
+
+```{r save deseq2 tmao tertile results}
+write.csv(sigtabgen, "../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile.csv")
 ```
 
 ## Factored by TMAO Quantile 
@@ -431,7 +435,6 @@ ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
 ```
-
 
 # Alpha Diversity Analysis
 
@@ -548,21 +551,33 @@ ggplot(df2, aes(x=tmao_log, y=observed_otus)) +
 
 ```{r Beta diversity calculations}
 # PCoA
-PCoA_WU <- ordinate(PSOtmao4G, "PCoA", "wunifrac")
-PCoA_UnWU <- ordinate(PSOtmao4G, "PCoA", "uunifrac")
-PCoA_BC <- ordinate(PSOtmao4G, "PCoA", "bray")
+PCoA_WU <- ordinate(PSOtmao1G, "PCoA", "wunifrac")
+PCoA_UnWU <- ordinate(PSOtmao1G, "PCoA", "uunifrac")
+PCoA_BC <- ordinate(PSOtmao1G, "PCoA", "bray")
 
 # Calculate distance matrix
-dismax_wu = phyloseq::distance(PSOtmao4G, method="wunifrac", type = "samples")
-dismax_uwu = phyloseq::distance(PSOtmao4G, method="unifrac", type = "samples")
-dismax_bc = phyloseq::distance(PSOtmao4G, method="bray", type = "samples")
+dismax_wu = phyloseq::distance(PSOtmao1G, method="wunifrac", type = "samples")
+dismax_uwu = phyloseq::distance(PSOtmao1G, method="unifrac", type = "samples")
+dismax_bc = phyloseq::distance(PSOtmao1G, method="bray", type = "samples")
 
+```
+
+Save
+
+```{r save beta matrices}
+save(PCoA_WU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_WU.RData")
+save(PCoA_UnWU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_UnWU.RData")
+save(PCoA_BC, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_BC.RData")
+
+save(dismax_wu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_WU.RData")
+save(dismax_uwu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_UWU.RData")
+save(dismax_bc, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_BC.RData")
 ```
 
 
 ```{r Beta diversity stats}
 # Get sample_data
-df <- as(sample_data(PSOtmao4G), "data.frame")
+df <- as(sample_data(PSOtmao1G), "data.frame")
 df$tmao_mdn <- relevel(df$tmao_mdn, ref = "below")
 
 #~~~~~~~~~~~
@@ -574,7 +589,8 @@ permutest(bdis) # NS, good
 boxplot(bdis, las = 2)
 
 # ADONIS (perMANOVA) analysis
-adonis2(dismax_wu ~ tmao_log + sex:age + bmi_final.y, data=df, method = "wunifrac", perm=999) # .025
+adonis2(dismax_wu ~ tmao_log + sex + age + bmi_final.y, data=df, method = "wunifrac", perm=999) # .025
+#adonis2(tmao_log ~ dismax_wu + sex*age + cystatinc_bd1, data=df, method = "wunifrac", perm=999) 
 
 #~~~~~~~~~~~
 # Unweighted
@@ -585,7 +601,8 @@ permutest(bdis) # NS, good
 boxplot(bdis, las = 2)
 
 # ADONIS (perMANOVA) analysis
-adonis2(dismax_uwu ~ tmao_log + sex:age + bmi_final.y, data=df, method = "unifrac", perm=999) # .001
+adonis2(dismax_uwu ~ tmao_log + sex + age + bmi_final.y, data=df, method = "unifrac", perm=999) # .001
+#adonis2(tmao_log ~ dismax_uwu + sex*age + cystatinc_bd1, data=df, method = "unifrac", perm=999) 
 
 #~~~~~~~~~~~
 # BrayCurtis
@@ -596,7 +613,8 @@ permutest(bdis) # NS, good
 boxplot(bdis, las = 2)
 
 # ADONIS (perMANOVA) analysis
-adonis2(dismax_bc ~ tmao_log + sex:age + bmi_final.y, data=df, method = "bray", perm=999) # .017
+adonis2(dismax_bc ~ tmao_log + sex + age + bmi_final.y, data=df, method = "bray", perm=999) # .017
+#adonis2(tmao_log ~ dismax_bc + sex*age + cystatinc_bd1, data=df, method = "bray", perm=999) 
 
 ```
 
@@ -906,161 +924,405 @@ p <- ggplot(data = ggData2,
 
 p
 ```
+# Stats for paper
 
-Repeat looking at tertile 1 and 3. This section isn't currently working but I'm not sure why. 
+Take a TMAO centric view point. So for the following questions, consider the whole group and the TMAO quantiles/tertiles. 
 
-```{r ANCOM - genus level with covariates tertile}
-source("../../Rscripts/ancom_v2.1.R")
+```{r Desc.Stats set up}
+# Get sample data groupings
+sampleData <- as.data.frame(sample_data(PSOtmao1))
+sampleData <- subset(sampleData, select = c(tmao_mdn, tmao_quantile, tmao_tertile, tmao))
 
-# OTU table
-MicroData <- otu_table(PSOtmao1G)
-MicroData <- as.data.frame(as.matrix(MicroData), stringsAsFactors = F)
-# Add 1
-#MicroData2 <- MicroData +1
-#MicroData2 <- as.data.frame(as.matrix(t(MicroData2),stringsAsFactors = F))
-#dim(MicroData2) # 103 x 98
+# Make lists of participants in each group
+tertile1 <- rownames(sampleData[sampleData$tmao_tertile == "Tertile1",])
+tertile2 <- rownames(sampleData[sampleData$tmao_tertile == "Tertile2",])
+tertile3 <- rownames(sampleData[sampleData$tmao_tertile == "Tertile3",])
 
-# Load the phenotype data
-#------------------------
-# Perform ANCOM analysis
-# Step 1: Data preprocessing
-# OTU data
-otu_data <- otu_table(PSOtmao1G)
-otu_data <- as.data.frame(as.matrix(otu_data), stringsAsFactors = F)
-otu_id <- rownames(otu_data)
+# Get OTU table
+otuTbl_PSO1 <- as.data.frame(otu_table(PSOtmao1))
+otuTbl_PSO1 <- as.data.frame(t(otuTbl_PSO1)) # subjects to rows
 
-# Metadata 
-#df <- readRDS("../data_processed/mapping/Biocrates_mapping_BD1_210809.rds")
-#df$p.Cresol.SO4_bd1_mdn <- plyr::revalue(df$p.Cresol.SO4_bd1_mdn, c("0" = "< Median", "1" = "> Median"))
-# Subset
-MetaData2 <- df2 %>% dplyr::select(c(tmao_mdn, age, sex, bmi_final))
-MetaData2$Sample.ID <- rownames(MetaData2)
+# Get tax table
+taxaData <- as.data.frame(tax_table(PSOtmao1))
+taxaData$PCOFG <- paste0(taxaData$Phylum, taxaData$Class, taxaData$Order, taxaData$Family, taxaData$Genus)
 
+```
 
-feature_table = otu_data; sample_var = "Sample.ID"; group_var = NULL
-out_cut = 0.05; zero_cut = 0.95; lib_cut = 1000; neg_lb = FALSE # make zero_cut=0.95 to match criteria used for other metabolites
-# Function
-prepro = feature_table_pre_process(feature_table = feature_table,
-                                   meta_data = MetaData2,
-                                   sample_var = sample_var,
-                                   group_var = NULL,
-                                   out_cut = out_cut,
-                                   zero_cut = zero_cut,
-                                   lib_cut = lib_cut,
-                                   neg_lb = neg_lb)
+How many OTUs (not glommed) in analysis?
 
-# Step 2: ANCOM
-feature_table = prepro$feature_table 
-meta_data = prepro$meta_data
-struc_zero = prepro$structure_zeros
+```{r How many}
+#~~~~~~~~~~
+# Tertile 1
+#~~~~~~~~~~
+# What is the average number of OTUs per participant in tertile 1?
+taxa_occurrences_T1 <- sapply(otuTbl_PSO1[row.names(otuTbl_PSO1) %in% tertile1,], function(x) sum(x>0))
+summary(taxa_occurrences_T1)
 
-# Step 2.1: Tertile 1 and 3
-tert1_3 <- df2[df2$tmao_tertile == "Tertile1" | df2$tmao_tertile == "Tertile3",]
-feature_table = feature_table[,colnames(feature_table) %in% rownames(tert1_3)]
-meta_data = meta_data[rownames(meta_data) %in% rownames(tert1_3),]
+otuTbl_PSO1_smpCol <- as.data.frame(t(otuTbl_PSO1))
+ppl_occurrences_T1 <- sapply(otuTbl_PSO1_smpCol[colnames(otuTbl_PSO1_smpCol) %in% tertile1,], function(x) sum(x>0))
+summary(ppl_occurrences_T1)
 
-# Define variables for ANCOM
-main_var = "tmao_tertile"; p_adj_method = "BH"; alpha = 0.05
-adj_formula = c("age + sex + bmi_final"); rand_formula = NULL
-# Run ANCCOM
-t_start = Sys.time()
-res = ANCOM(feature_table = feature_table, 
-            meta_data = meta_data, 
-            struc_zero = struc_zero, 
-            main_var = main_var, 
-            p_adj_method = p_adj_method, 
-            alpha = alpha, 
-            adj_formula = adj_formula, 
-            rand_formula = rand_formula)
-t_end = Sys.time()
-t_run = t_end - t_start 
-t_run # around 5s
+#~~~~~~~~~~
+# Tertile 2
+#~~~~~~~~~~
+# What is the average number of OTUs per participant in tertile 1?
+taxa_occurrences_T2 <- sapply(otuTbl_PSO1[row.names(otuTbl_PSO1) %in% tertile2,], function(x) sum(x>0))
+summary(taxa_occurrences_T2)
 
-# Results
-res$out
-res$fig$data
+otuTbl_PSO1_smpCol <- as.data.frame(t(otuTbl_PSO1))
+ppl_occurrences_T2 <- sapply(otuTbl_PSO1_smpCol[colnames(otuTbl_PSO1_smpCol) %in% tertile2,], function(x) sum(x>0))
+summary(ppl_occurrences_T2)
 
-# Step 3: Volcano Plot
-# Number of taxa except structural zeros
-n_taxa = ifelse(is.null(struc_zero), nrow(feature_table), sum(apply(struc_zero, 1, sum) == 0))
-# Cutoff values for declaring differentially abundant taxa
-cut_off = c(0.9 * (n_taxa -1), 0.8 * (n_taxa -1), 0.7 * (n_taxa -1), 0.6 * (n_taxa -1))
-names(cut_off) = c("detected_0.9", "detected_0.8", "detected_0.7", "detected_0.6")
+#~~~~~~~~~~
+# Tertile 3
+#~~~~~~~~~~
+# What is the average number of OTUs per participant in tertile 1?
+taxa_occurrences_T3 <- sapply(otuTbl_PSO1[row.names(otuTbl_PSO1) %in% tertile3,], function(x) sum(x>0))
+summary(taxa_occurrences_T3)
 
-# Annotation data
-dat_ann = data.frame(x = min(res$fig$data$x), y = cut_off["detected_0.7"], label = "W[0.7]")
-
-fig = res$fig +  
-  geom_hline(yintercept = cut_off["detected_0.7"], linetype = "dashed") + 
-  geom_text(data = dat_ann, aes(x = x, y = y, label = label), 
-            size = 4, vjust = -0.5, hjust = 0, color = "orange", parse = TRUE)
-fig  
-
-# ORGANIZE PLOT
-
-TaxaData2 <- readRDS("../../data/processed/microbiome/phyloseq_inputs/merged-taxonomy-dada2-retrained.rds")
-rownames(TaxaData2) <- TaxaData2$Feature.ID
-
-ancomRes <- res$out
-
-test <- merge(ancomRes, TaxaData2, by.x = "taxa_id", by.y = "Feature.ID", all.x = TRUE, all.y = FALSE)
-
-# Make plot 
-tempdata <- test[test$detected_0.6 == TRUE,] # 0.6 but can make 0.7
-asv_id <- unique(tempdata$taxa_id)
-
-MicroData4 <- feature_table[row.names(feature_table) %in% asv_id,]
-
-# Rename to the taxonomy 
-#MicroData5 <- as.data.frame(as.matrix(t(MicroData4)))
-TaxaData3 <- TaxaData2 %>% dplyr::select(Order, Family, Genus)
-# Make a unique naming column that incorporates multiple levels of taxonomy
-TaxaData3$OrderFamilyGenus <- paste(TaxaData3$Order, TaxaData3$Family, TaxaData3$Genus)
-rownames(TaxaData3) <- rownames(TaxaData2)
-# Merge
-MicroData5 <- merge(MicroData4, TaxaData3,
-                    by=0, all.x = T, all.y = F)
-
-row.names(MicroData5) <- MicroData5$OrderFamilyGenus
-
-MicroData5 <- MicroData5 %>%  dplyr::select(-Order, -Family, -Genus, -OrderFamilyGenus, -Row.names)
-MicroData5 <- as.data.frame(as.matrix(t(MicroData5)))
-
-# Merge with the phenotype data 
-MetaData3 <- MetaData2 %>% dplyr::select(tmao_tertile)
-
-ggData <- merge(MetaData3, MicroData5, by =0)
-row.names(ggData) <- ggData$Row.names
-ggData <- ggData %>% dplyr::select(-Row.names)
-
-# Gather the data
-library(tidyr)
-ggData2 <- gather(ggData,
-                  key = "Taxa",
-                  value = "Abundance",
-                  -tmao_tertile)
-                
-ggData2$Abundance <- log(ggData2$Abundance)
-
-# Plot it
-p <- ggplot(data = ggData2,
-            aes(x = Taxa, 
-                y = Abundance,
-                fill = tmao_tertile), 
-            alpha = 0.1) +
-  geom_boxplot(lwd=.25) +
-  xlab(NULL) +
-  ylab("Log of Taxa Abundance") +
-  theme_bw() + # note order matters here - need bw to be before theme()
-  theme(axis.text.y = element_text( hjust = 1),
-        axis.text.x = element_text(angle = 60, hjust = 1),
-        text=element_text(size=11))  +
-  scale_fill_manual(values=c("#2D708EFF", "#B8DE29FF")) + 
-  #scale_fill_viridis(discrete = TRUE) +
-  #coord_flip() +
-  labs(fill = "TMAO \n Classification")
-
-p
+otuTbl_PSO1_smpCol <- as.data.frame(t(otuTbl_PSO1))
+ppl_occurrences_T3 <- sapply(otuTbl_PSO1_smpCol[colnames(otuTbl_PSO1_smpCol) %in% tertile3,], function(x) sum(x>0))
+summary(ppl_occurrences_T3)
 ```
 
 
+How many OTUs are present in 5%, 25%, 50% of samples?
+
+```{r}
+
+```
+
+What is the firmicutes to bacteroidetes ratio per tertile?
+How common are Firmicutes? Mean, SD, range?
+How common are Bacteroidetes? Mean, SD, range?
+
+```{r Firmicutes to bacteroidetes ratio per tertile}
+PSOtmao1_Phylum <- tax_glom(PSOtmao1, "Phylum", NArm = TRUE)
+PSOtmao1_Phylum_tertile1 <- subset_samples(PSOtmao1_Phylum, tmao_tertile == "Tertile1")
+PSOtmao1_Phylum_tertile2 <- subset_samples(PSOtmao1_Phylum, tmao_tertile == "Tertile2")
+PSOtmao1_Phylum_tertile3 <- subset_samples(PSOtmao1_Phylum, tmao_tertile == "Tertile3")
+
+#~~~~~~~~~~
+# Tertile 1
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalence_Phy_tert1 = apply(X = otu_table(PSOtmao1_Phylum_tertile1),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1_Phylum_tertile1), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalence_Phy_tert1 = data.frame(Prevalence = prevalence_Phy_tert1,
+                    TotalAbundance = taxa_sums(PSOtmao1_Phylum_tertile1), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1_Phylum_tertile1))
+
+# Firmicutes:Bacteroidetes Abundance Ratio
+firm_bacter_t1 <- prevalence_Phy_tert1$TotalAbundance[prevalence_Phy_tert1$Phylum == " p__Firmicutes"] / prevalence_Phy_tert1$TotalAbundance[prevalence_Phy_tert1$Phylum == " p__Bacteroidetes"] 
+
+#~~~~~~~~~~
+# Tertile 2
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalence_Phy_tert2 = apply(X = otu_table(PSOtmao1_Phylum_tertile2),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1_Phylum_tertile2), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalence_Phy_tert2 = data.frame(Prevalence = prevalence_Phy_tert2,
+                    TotalAbundance = taxa_sums(PSOtmao1_Phylum_tertile2), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1_Phylum_tertile2))
+
+firm_bacter_t2 <- prevalence_Phy_tert2$TotalAbundance[prevalence_Phy_tert2$Phylum == " p__Firmicutes"] / prevalence_Phy_tert2$TotalAbundance[prevalence_Phy_tert2$Phylum == " p__Bacteroidetes"] 
+
+#~~~~~~~~~~
+# Tertile 3
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalence_Phy_tert3 = apply(X = otu_table(PSOtmao1_Phylum_tertile3),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1_Phylum_tertile3), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalence_Phy_tert3 = data.frame(Prevalence = prevalence_Phy_tert3,
+                    TotalAbundance = taxa_sums(PSOtmao1_Phylum_tertile3), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1_Phylum_tertile3))
+
+firm_bacter_t3 <- prevalence_Phy_tert3$TotalAbundance[prevalence_Phy_tert3$Phylum == " p__Firmicutes"] / prevalence_Phy_tert3$TotalAbundance[prevalence_Phy_tert3$Phylum == " p__Bacteroidetes"] 
+
+# Compare ratios
+cat("Firmicutes:Bacteroidetes ratio tertile 1:", firm_bacter_t1)
+cat("Firmicutes:Bacteroidetes ratio tertile 2:", firm_bacter_t2)
+cat("Firmicutes:Bacteroidetes ratio tertile 3:", firm_bacter_t3)
+
+```
+
+What is the % abundance of a given taxa? Get summary statistics per tertile. 
+
+Range percentage of taxa per person = n occurrences of bug/total occurrences of all bugs * 100
+
+```{r Firmicute summary}
+#~~~~~~~~~~
+# Tertile 1
+#~~~~~~~~~~
+trans <- transform_sample_counts(PSOtmao1_Phylum_tertile1, function(x) x / sum(x))
+melted <- psmelt(trans)
+subdf <- melted[melted$Phylum == " p__Firmicutes", ]
+cat("Summmary of Firmicute abundance in tertile 1:")
+summary(subdf$Abundance)
+
+#~~~~~~~~~~
+# Tertile 2
+#~~~~~~~~~~
+trans <- transform_sample_counts(PSOtmao1_Phylum_tertile2, function(x) x / sum(x))
+melted <- psmelt(trans)
+subdf <- melted[melted$Phylum == " p__Firmicutes", ]
+cat("Summmary of Firmicute abundance in tertile 2:")
+summary(subdf$Abundance)
+
+#~~~~~~~~~~
+# Tertile 3
+#~~~~~~~~~~
+trans <- transform_sample_counts(PSOtmao1_Phylum_tertile3, function(x) x / sum(x))
+melted <- psmelt(trans)
+subdf <- melted[melted$Phylum == " p__Firmicutes", ]
+cat("Summmary of Firmicute abundance in tertile 3:")
+summary(subdf$Abundance)
+
+```
+
+```{r Bacteroidetes summary}
+#~~~~~~~~~~
+# Tertile 1
+#~~~~~~~~~~
+trans <- transform_sample_counts(PSOtmao1_Phylum_tertile1, function(x) x / sum(x))
+melted <- psmelt(trans)
+subdf <- melted[melted$Phylum == " p__Bacteroidetes", ]
+cat("Summmary of Bacteroidetes abundance in tertile 1:")
+summary(subdf$Abundance)
+
+#~~~~~~~~~~
+# Tertile 2
+#~~~~~~~~~~
+trans <- transform_sample_counts(PSOtmao1_Phylum_tertile2, function(x) x / sum(x))
+melted <- psmelt(trans)
+subdf <- melted[melted$Phylum == " p__Bacteroidetes", ]
+cat("Summmary of Bacteroidetes abundance in tertile 2:")
+summary(subdf$Abundance)
+
+#~~~~~~~~~~
+# Tertile 3
+#~~~~~~~~~~
+trans <- transform_sample_counts(PSOtmao1_Phylum_tertile3, function(x) x / sum(x))
+melted <- psmelt(trans)
+subdf <- melted[melted$Phylum == " p__Bacteroidetes", ]
+cat("Summmary of Bacteroidetes abundance in tertile 3:")
+summary(subdf$Abundance)
+
+```
+
+Genus: What are the most common genus?
+Use the PSOtmao1G, subset to low-tertile, make prevalence data frame, sort in descending order. Repeat for other tertiles.
+
+```{r Genus Prevalence by TMAO Tertile}
+# Subset by tertiles 
+PSOtmao1_tertile1 <- subset_samples(PSOtmao1, tmao_tertile == "Tertile1")
+PSOtmao1_tertile2 <- subset_samples(PSOtmao1, tmao_tertile == "Tertile2")
+PSOtmao1_tertile3 <- subset_samples(PSOtmao1, tmao_tertile == "Tertile3")
+
+# How many taxa are there per tertile?
+cat("n taxa in tertile 1:", ntaxa(PSOtmao1_tertile1))
+cat("n taxa in tertile 2:", ntaxa(PSOtmao1_tertile2))
+cat("n taxa in tertile 3:", ntaxa(PSOtmao1_tertile3))
+
+# Now subset at the genus level to identify the most common genus
+# Subset by tertiles (Genus)
+PSOtmao1G_tertile1 <- subset_samples(PSOtmao1G, tmao_tertile == "Tertile1")
+PSOtmao1G_tertile2 <- subset_samples(PSOtmao1G, tmao_tertile == "Tertile2")
+PSOtmao1G_tertile3 <- subset_samples(PSOtmao1G, tmao_tertile == "Tertile3")
+
+#~~~~~~~~~~
+# Tertile 1
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalence_tert1 = apply(X = otu_table(PSOtmao1G_tertile1),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1G_tertile1), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalence_tert1 = data.frame(Prevalence = prevalence_tert1,
+                    TotalAbundance = taxa_sums(PSOtmao1G_tertile1), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1G_tertile1))
+
+
+#~~~~~~~~~~
+# Tertile 2
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalence_tert2 = apply(X = otu_table(PSOtmao1G_tertile2),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1G_tertile2), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalence_tert2 = data.frame(Prevalence = prevalence_tert2,
+                    TotalAbundance = taxa_sums(PSOtmao1G_tertile2), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1G_tertile2))
+#~~~~~~~~~~
+# Tertile 3
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalence_tert3 = apply(X = otu_table(PSOtmao1G_tertile3),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1G_tertile3), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalence_tert3 = data.frame(Prevalence = prevalence_tert3,
+                    TotalAbundance = taxa_sums(PSOtmao1G_tertile3), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1G_tertile3))
+```
+
+View and sort top 10
+```{r View abundant genus top 10}
+cat("Most abundant genus in T1:")
+head(prevalence_tert1[order(prevalence_tert1$TotalAbundance, decreasing= TRUE),], n = 10)
+cat("Most abundant genus in T2:")
+head(prevalence_tert2[order(prevalence_tert2$TotalAbundance, decreasing= TRUE),], n = 10)
+cat("Most abundant genus in T3:")
+head(prevalence_tert3[order(prevalence_tert3$TotalAbundance, decreasing= TRUE),], n = 10)
+
+```
+
+Save
+
+```{r Save tertile prevalence csv}
+write.csv(prevalence_tert1, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile1.csv")
+write.csv(prevalence_tert2, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile2.csv")
+write.csv(prevalence_tert3, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile3.csv")
+```
+
+# Correlate Fecal Microbiome with Phenos
+
+Now that we identified microbiome characteristics that are relevant to TMAO, ask if they 
+
+1) Improve the variance explained between TMAO and a given cardiometabolic marker
+2) Correlate to cardiometabolic phenos
+
+```{r Get the microbiome data ready to combine with pheno data}
+da <- read.csv("../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile.csv", row.names = 1)
+resOTU <- rownames(da)
+otuData <- as.data.frame(otu_table(PSOtmao1G))
+otuData_desRes <- otuData[rownames(otuData) %in% resOTU,]
+otuData_desRes <- as.data.frame(t(otuData_desRes))
+# rename for ease downstream
+names(otuData_desRes)[names(otuData_desRes) == "bb1b75f41ff9c9db1d1de41e8388eb52"] <- "f__Bacteroidaceae_g__Bacteroides"
+names(otuData_desRes)[names(otuData_desRes) == "b180a2455b236c103cf0bfe620095736"] <- "f__Peptostreptococcaceae_g__"
+names(otuData_desRes)[names(otuData_desRes) == "e1a2800b24cdf9779b28dc897cddb12a"] <- "f__Christensenellaceae_g__"
+names(otuData_desRes)[names(otuData_desRes) == "8f5ceded1cd7e86b8271d3fab24d322a"] <- "f__Lachnospiraceae_g__Butyrivibrio"
+```
+
+Next chunk is borrowed from "Characteristics_Diet_Cardiometabolic"
+
+```{r Load phenotype data}
+phen <- readRDS("../../data/processed/phenotype/Phenotypes_211108.rds")
+
+# Complete TMAO data only
+phen <- phen[complete.cases(phen$tmao == TRUE),]
+
+# Get rid of NA ethnicity category
+phen$ethnicity <- droplevels(phen$ethnicity)
+
+# Factor and recode sex
+phen$sex <- as.factor(phen$sex)
+phen$sex <- plyr::revalue(phen$sex, c("1" = "Male", "2" = "Female"))
+
+# Make TMAO log variable
+phen$tmao_log <- log(phen$tmao)
+
+# Quantile
+tmao_quantile <- quantile(phen$tmao)
+phen$tmao_quantile <- ifelse(phen$tmao <= tmao_quantile[2], "Quantile1",
+                             ifelse(phen$tmao > tmao_quantile[2] & phen$tmao <= tmao_quantile[3], "Quantile2",
+                                   ifelse(phen$tmao > tmao_quantile[3] & phen$tmao <= tmao_quantile[4], "Quantile3", "Quantile4")))
+
+# Check it
+table(phen$tmao_quantile)
+phen$tmao_quantile <- as.factor(phen$tmao_quantile)
+str(phen$tmao_quantile)
+
+# Tertile
+tmao_tertile <- quantile(phen$tmao, c(0:3/3))
+phen$tmao_tertile <- ifelse(phen$tmao <= tmao_tertile[2], "Tertile1",
+                             ifelse(phen$tmao > tmao_tertile[2] & phen$tmao <= tmao_tertile[3], "Tertile2", "Tertile3"))
+# Factor it
+phen$tmao_tertile <- factor(phen$tmao_tertile)
+table(phen$tmao_tertile)
+
+# Checked all variables for normality via shapiro.test() in console. TG, and glc ere the only ones that didn't pass.
+phen$glc_bd1_ln <- log(phen$glc_bd1)
+phen$tg_bd1_ln <- log(phen$tg_bd1)
+phen$crp_bd1_ln <- log(phen$crp_bd1)
+phen$tnfa_bd1_ln <- log(phen$tnfa_bd1)
+phen$il6_bd1_ln <- log(phen$il6_bd1)
+```
+
+Merge phenotype and microbiome data for linear regression analysis
+```{r}
+phen <- merge(phen, otuData_desRes, by=0)
+rownames(phen) <- phen[,"Row.names"]
+phen <- subset(phen, select = -c(Row.names))
+```
+
+Run the regression!
+
+f__Bacteroidaceae_g__Bacteroides + f__Peptostreptococcaceae_g__ + f__Christensenellaceae_g__ + f__Lachnospiraceae_g__Butyrivibrio
+
+```{r Cardiometabolic + Microbiome Multiple Linear Regression}
+# Transfored variable list
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log", "f__Bacteroidaceae_g__Bacteroides", "f__Peptostreptococcaceae_g__", "f__Christensenellaceae_g__", "f__Lachnospiraceae_g__Butyrivibrio")
+
+#~~~~~~~~
+# TMAO  
+#~~~~~~~~
+# Make a smaller df from master (the old data)
+phen_sub <- phen[, colnames(phen) %in% transformed_keep_cardio_tbl]
+cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Bacteroidaceae_g__Bacteroides, f__Peptostreptococcaceae_g__, f__Christensenellaceae_g__, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
+n <- ncol(cvd_biomark)
+
+# LCMS method
+# Run linear model
+my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + sex + age + cystatinc_bd1, phen_sub )) # include kcal
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ ethnicity, phen_sub ))
+#my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ cystatinc_bd1, phen_sub ))
+
+# Organize results
+my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
+my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [CVD row, estimate] corresponds to CVD B 
+my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [CVD row, Std.Error] corresponds to CVD Std. Error 
+my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [CVD row, T value] corresponds to CVD t value
+my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [CVD row, P] corresponds to CVD P value
+my_lm361_lcms_cvd <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
+colnames(my_lm361_lcms_cvd) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
+row.names(my_lm361_lcms_cvd) <- colnames(cvd_biomark)
+res <- as.data.frame(my_lm361_lcms_cvd)
+
+# BH correction
+res$p.adj <- stats::p.adjust(res$P, method = "BH", n = n) 
+
+#~~~~~~~~
+# TMAO + Bug
+#~~~~~~~~
+# Make a smaller df from master (the old data)
+phen_sub <- phen[, colnames(phen) %in% transformed_keep_cardio_tbl]
+cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Bacteroidaceae_g__Bacteroides, f__Peptostreptococcaceae_g__, f__Christensenellaceae_g__, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
+n <- ncol(cvd_biomark)
+
+# LCMS method
+# Run linear model
+my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + sex + age + cystatinc_bd1 + f__Bacteroidaceae_g__Bacteroides + f__Peptostreptococcaceae_g__ + f__Christensenellaceae_g__ + f__Lachnospiraceae_g__Butyrivibrio, phen_sub )) # add bugs
+
+# Organize results
+my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
+my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [CVD row, estimate] corresponds to CVD B 
+my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [CVD row, Std.Error] corresponds to CVD Std. Error 
+my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [CVD row, T value] corresponds to CVD t value
+my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [CVD row, P] corresponds to CVD P value
+my_lm361_lcms_cvd_des <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
+colnames(my_lm361_lcms_cvd_des) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
+row.names(my_lm361_lcms_cvd_des) <- colnames(cvd_biomark)
+res_des <- as.data.frame(my_lm361_lcms_cvd_des)
+
+# BH correction
+res_des$p.adj <- stats::p.adjust(res_des$P, method = "BH", n = n) 
+```
