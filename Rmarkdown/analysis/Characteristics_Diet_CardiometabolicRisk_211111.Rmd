@@ -104,6 +104,7 @@ table_save.all <- print(table_tmao.all, quote = FALSE, noSpaces = TRUE, printTog
 write.csv(table_save.all, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_bySex_211111.csv")
 ```
 
+
 Is TMAO significantly different by ethnicity?
 ```{r Ethnicity}
 ethnicity_aov <- (aov(tmao_log ~ ethnicity, phen))
@@ -119,6 +120,7 @@ There are significant differences in TMAO levels by ethnic groups but ethnicity 
 Back to tables... make similar tables but show TMAO quantiles
 
 ```{r Quantile TMAO}
+# Quantile
 tmao_quantile <- quantile(phen$tmao)
 phen$tmao_quantile <- ifelse(phen$tmao <= tmao_quantile[2], "Quantile1",
                              ifelse(phen$tmao > tmao_quantile[2] & phen$tmao <= tmao_quantile[3], "Quantile2",
@@ -128,6 +130,17 @@ phen$tmao_quantile <- ifelse(phen$tmao <= tmao_quantile[2], "Quantile1",
 table(phen$tmao_quantile)
 phen$tmao_quantile <- as.factor(phen$tmao_quantile)
 str(phen$tmao_quantile)
+
+# Tertile
+tmao_tertile <- quantile(phen$tmao, c(0:3/3))
+phen$tmao_tertile <- ifelse(phen$tmao <= tmao_tertile[2], "Tertile1",
+                             ifelse(phen$tmao > tmao_tertile[2] & phen$tmao <= tmao_tertile[3], "Tertile2", "Tertile3"))
+# Factor it
+phen$tmao_tertile <- factor(phen$tmao_tertile)
+table(phen$tmao_tertile)
+
+# Print tertiles for manuscript
+tmao_tertile
 
 # Checked all variables for normality via shapiro.test() in console. TG, and glc ere the only ones that didn't pass.
 phen$glc_bd1_ln <- log(phen$glc_bd1)
@@ -167,6 +180,8 @@ table_tmao.allq <- CreateTableOne(vars = vars,
 table_tmao.allq
 ```
 
+Save 
+
 ```{r Save characteristic quantile tables}
 table_save.fq <- print(table_tmao.fq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byTMAOQuantile_211111.csv")
@@ -177,6 +192,61 @@ write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Characteri
 table_save.allq <- print(table_tmao.allq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOQuantile_211111.csv")
 ```
+
+Make similar tables but for TMAO tertile 
+
+```{r Participant characterisitics by TMAO tertile}
+# TMAO table by tmao_tertile - females
+factorVars <- c("age_cat", "tmao_tertile")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.ft <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = phen[phen$sex == "Female",],
+                                    factorVars = factorVars)
+table_tmao.ft
+
+# TMAO table by tmao_tertile - males
+factorVars <- c("age_cat", "tmao_tertile")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.mt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = phen[phen$sex == "Male",], # note 6103 and 7098 have high il6
+                                    factorVars = factorVars)
+table_tmao.mt
+
+# TMAO table by tmao_tertile - all, add sex
+factorVars <- c("tmao_tertile")
+vars <- c("age", "sex", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.allt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = phen,
+                                    factorVars = factorVars)
+table_tmao.allt
+
+# Do BH correction
+allt_ContTable <- attr(table_tmao.allt$ContTable, "pValues")
+n <- length(allt_ContTable$pNormal)
+# BH correction
+allt_ContTable$padj <- stats::p.adjust(allt_ContTable$pNormal, method = "BH", n = n) 
+allt_ContTable
+```
+
+Save 
+
+```{r Save characteristic tertile tables}
+table_save.ft <- print(table_tmao.ft, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.ft, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byTMAOTertile.csv")
+
+table_save.mt <- print(table_tmao.mt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.mt, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byTMAOTertile.csv")
+
+table_save.allt <- print(table_tmao.allt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.allt, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOTertile.csv")
+
+# BH corrections for the all tertile table
+write.csv(allt_ContTable, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOTertile_Padj.csv")
+```
+
 
 # Cardiometabolic Risk Analysis 
 
@@ -485,6 +555,90 @@ table_save.allq <- print(table_food.allq, quote = FALSE, noSpaces = TRUE, printT
 write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOQuantile_211111.csv")
 ```
 
+TMAO tertile 
+Make TMAO food intake by tertile table
+```{r Food Intake by TMAO tertile}
+# TMAO table by age bin - females
+factorVars <- c("age_cat", "tmao_quantile")
+vars <- c("pf_meat_totals", 
+          "pf_curedmeat_totals",
+          "pf_poult_totals",
+          "pf_seafd_hi_totals",
+          "pf_seafd_low_totals",
+          "pf_eggs_totals",
+          "pf_nutsds_totals",
+          "pf_legumes_totals",
+          "pf_total_totals",
+          #"pf_soy_totals_Binary",
+          "v_drkgr_totals",
+          "v_redor_total_totals",
+          #"v_redor_tomato_totals",
+          #"v_redor_other_totals",
+          "v_starchy_total_totals",
+          #"v_starchy_potato_totals",
+          #"v_starchy_other_totals",
+          "v_other_totals",
+          "v_total_totals",
+          #"v_legumes_total",
+          "g_whole_totals",
+          "g_refined_totals",
+          "g_total_totals",
+          "d_total_totals",
+          "d_milk_totals",
+          "d_cheese_totals",
+          "d_yogurt_totals",
+          "hei_asa24_totalscore",
+          "hei_asa24_totalveg",
+          "hei_asa24_sfat",
+          "hei_asa24_",
+          "age",
+          "ethnicity" ,
+          "bmi_final",
+          "tmao",
+          "choline",
+          "betaine",
+          "carnitine")
+table_food.ft <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = full[full$sex == "Female",],
+                                    factorVars = factorVars)
+table_food.ft
+
+# TMAO table by age bin - males
+table_food.mt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = full[full$sex == "Male",],
+                                    factorVars = factorVars)
+table_food.mt
+
+# TMAO table by sex
+table_food.allt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = full,
+                                    factorVars = factorVars)
+table_food.allt
+
+# Do BH correction
+food_allt_ContTable <- attr(table_food.allt$ContTable, "pValues")
+n <- length(food_allt_ContTable$pNormal)
+# BH correction
+food_allt_ContTable$padj <- stats::p.adjust(food_allt_ContTable$pNormal, method = "BH", n = n) 
+food_allt_ContTable
+```
+
+```{r Save food tertile tables}
+table_save.ft <- print(table_food.ft, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.ft, file = "../../Outputs/tables/ParticipantChar/Food_Female_byTMAOTertile.csv")
+
+table_save.mt <- print(table_food.mt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.mt, file = "../../Outputs/tables/ParticipantChar/Food_Male_byTMAOTertile.csv")
+
+table_save.allt <- print(table_food.allt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.allt, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOTertile.csv")
+
+write.csv(food_allt_ContTable, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOTertile_PadjTable.csv")
+```
+
 # Miscellaneous for paper
 
 Demonstrate the sex:age interaction for females.
@@ -497,18 +651,35 @@ Describe meat intake in the cohort
 ```{r Meat intake}
 # Beef, veal, pork, lamb, and game meat; excludes organ meat and cured meat (oz. eq.)
 summary(full$pf_meat_totals)
+sd(full$pf_meat_totals)
 
 # Frankfurters, sausages, corned beef, and luncheon meat that are made from beef, pork, or poultry (oz. eq.)
 summary(full$pf_curedmeat_totals)
+sd(full$pf_curedmeat_totals)
+
+# Chicken, turkey, Cornish hens, duck, goose, quail, and pheasant (game birds); excludes organ meat and cured meat (oz. eq.)
+summary(full$pf_poult_totals)
+sd(full$pf_poult_totals)
 
 # Total meat, poultry, organ meat, cured meat, seafood, eggs, soy, and nuts and seeds; excludes legumes (oz. eq.)
 summary(full$pf_total_totals)
+sd(full$pf_total_totals)
 
 # Total of meat, poultry, seafood, organ meat, and cured meat (oz. eq.)
 summary(full$pf_mps_total_totals)
+sd(full$pf_mps_total_totals)
+
+# Eggs (chicken, duck, goose, quail) and egg substitutes (oz. eq.)
+summary(full$pf_eggs_totals)
+sd(full$pf_eggs_totals)
+
+# HEI total score
+summary(full$hei_asa24_totalscore)
+sd(full$hei_asa24_totalscore, na.rm = TRUE)
 
 # Kcal
 summary(full$kcal_tnfs)
+sd(full$kcal_tnfs)
 ```
 
 ```{r}
