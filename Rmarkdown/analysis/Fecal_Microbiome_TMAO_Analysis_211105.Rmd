@@ -1258,7 +1258,7 @@ phen$il6_bd1_ln <- log(phen$il6_bd1)
 ```
 
 Merge phenotype and microbiome data for linear regression analysis
-```{r}
+```{r Merge pheno and microbiome tertile DESeq results}
 phen <- merge(phen, otuData_desRes, by=0)
 rownames(phen) <- phen[,"Row.names"]
 phen <- subset(phen, select = -c(Row.names))
@@ -1326,3 +1326,10 @@ res_des <- as.data.frame(my_lm361_lcms_cvd_des)
 # BH correction
 res_des$p.adj <- stats::p.adjust(res_des$P, method = "BH", n = n) 
 ```
+
+The family christensenellaceae is widely inversely associated with BMI. A review is [here](https://bmcbiol.biomedcentral.com/articles/10.1186/s12915-019-0699-4).
+
+```{r Christensenellaceae genus and BMI}
+summary(lm(f__Christensenellaceae_g__ ~ bmi_final + sex + age, phen))
+```
+
