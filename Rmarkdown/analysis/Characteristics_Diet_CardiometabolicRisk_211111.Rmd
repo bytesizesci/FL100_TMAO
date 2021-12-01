@@ -47,6 +47,7 @@ phen$sex <- plyr::revalue(phen$sex, c("1" = "Male", "2" = "Female"))
 
 # Make TMAO log variable
 phen$tmao_log <- log(phen$tmao)
+
 ```
 
 # Descriptive Characteristics
@@ -390,6 +391,9 @@ food <- readRDS(file = "../../data/processed/asa24/ASA24_meanIntake_withTransfor
 full <- merge(phen, food, by = 0)
 row.names(full) <- full[,"Row.names"]
 full <- subset(full, select = -c(Row.names))
+
+# Make ASA24 choline log variable
+full$choln_tnfs_log <- log(full$choln_tnfs)
 ```
 
 Make a list of foods and covariate variables to keep.
@@ -444,7 +448,8 @@ transformed_keep_tbl <- c("sex",
 "T.d_total_totals_sqrRt",
 "T.d_milk_totals_sqrRt",
 "T.d_cheese_totals_sqrRt",
-"T.d_yogurt_totals_Binary"
+"T.d_yogurt_totals_Binary",
+"choln_tnfs_log"
 )
 ```
 
@@ -516,6 +521,7 @@ vars <- c("pf_meat_totals",
           "hei_asa24_totalveg",
           "hei_asa24_sfat",
           "hei_asa24_",
+          "choln_tnfs",
           "age",
           "ethnicity" ,
           "bmi_final",
@@ -591,6 +597,7 @@ vars <- c("pf_meat_totals",
           "hei_asa24_totalveg",
           "hei_asa24_sfat",
           "hei_asa24_",
+          "choln_tnfs",
           "age",
           "ethnicity" ,
           "bmi_final",
@@ -682,10 +689,15 @@ summary(full$kcal_tnfs)
 sd(full$kcal_tnfs)
 ```
 
+"waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln",
+
+
+BS section below...
 ```{r}
 full$low_mps_meat <- ifelse(full$pf_mps_total_totals <= median(full$pf_mps_total_totals), "low", "high")
 full$low_mps_meat <- ifelse(full$pf_mps_total_totals <= 9.091, "low", "high")
-summary(lm(tmao_log ~ low_mps_meat + sex*age + cystatinc_bd1 + kcal_tnfs, full))
+summary(lm(glc_bd1_ln ~  tmao_log + sex*age + cystatinc_bd1, full[full$low_mps_meat == "high",]))
+summary(lm(glc_bd1_ln ~  tmao_log + sex*age + cystatinc_bd1, full[full$low_mps_meat == "high",]))
 ```
 
 
