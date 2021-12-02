@@ -33,7 +33,7 @@ output:
 
 # Set Up
 
-```{r, warning=FALSE,message=FALSE}
+```{r, warning=FALSE, message=FALSE}
 library(DESeq2)
 library(phyloseq)
 library(ggplot2)
@@ -237,7 +237,7 @@ plot.composition.relAbun
 # Agglomerate taxa
 PSOtmao1F = tax_glom(PSOtmao1, "Family", NArm = TRUE)
 PSOtmao1F.top10 <- microbiome::aggregate_top_taxa(PSOtmao1F, "Family", top = 10)
-ps1F.10.family.comp <- microbiome::transform(PSOtmao1F.top10, transform="compositional")
+ps1F.10.family.comp <- microbiome::transform(PSOtmao1F.top10, transform="compositional") #compositional
 
 plot.composition.relAbun <- microbiome::plot_composition(ps1F.10.family.comp,
                                              sample.sort = "Description",
@@ -245,13 +245,15 @@ plot.composition.relAbun <- microbiome::plot_composition(ps1F.10.family.comp,
                                              group_by = "tmao_tertile",
                                              average_by = "tmao_tertile") +
   theme_minimal() +
+  upstartr::scale_y_percent() + 
   scale_fill_brewer("Family", palette = "Paired") + 
-  ggtitle("Relative Abundance at Family Level")
+  labs(x= "TMAO Tertiles", y = "Relative Abundance (%)", 
+       title = "Relative Abundance of Top 10 Prevalent Families")
 
 plot.composition.relAbun
 
 # Save
-jpeg("../../Outputs/plots/microbiome/RelAbund_Fam_TMAOTertiles_2111.jpg", width = 4, height = 4, res = 300)
+tiff("../../Outputs/plots/microbiome/RelAbund_Fam_TMAOTertiles_2111.tiff", width = 4, height = 4, units = 'in', res = 300)
 plot.composition.relAbun
 dev.off()
 ```
@@ -354,14 +356,25 @@ sigtabgen$Phylum = factor(as.character(sigtabgen$Phylum), levels=names(x))
 x = tapply(sigtabgen$log2FoldChange, sigtabgen$Genus, function(x) max(x))
 x = sort(x, TRUE)
 sigtabgen$Genus = factor(as.character(sigtabgen$Genus), levels=names(x))
-ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) + 
+DESeqPlot <- ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) + 
   geom_vline(xintercept = 0.0, color = "gray", size = 0.5) +
   geom_point(size=3) + 
   ylab("Taxonomy") +
   xlab("Log2 Fold Change") + 
-  scale_color_brewer(palette = "Dark2") +
+  scale_color_brewer(palette = "Paired") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+DESeqPlot
+
+# Save
+tiff("../../Outputs/plots/microbiome/DESeq2_Genus_TMAOTertile1v3_2112.tiff", width = 8, height = 3, units = 'in', res = 300)
+DESeqPlot
+dev.off()
 ```
 Save
 
@@ -490,7 +503,7 @@ y_variable <- "Shannon"
 x_variable <- "Natural Log of TMAO (uM)"
 mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df2, aes(x=tmao_log, y=shannon)) +
+shannon_plot <- ggplot(df2, aes(x=tmao_log, y=shannon)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -498,14 +511,20 @@ ggplot(df2, aes(x=tmao_log, y=shannon)) +
   ylab(y_variable) +
   xlab(x_variable) +
   labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+shannon_plot
 
 # Faith's Phylogenetic Diversity
 y_variable <- "Faith's Phylogenetic Diversity"
 x_variable <- "Natural Log of TMAO (uM)"
 mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df2, aes(x=tmao_log, y=faith_pd)) +
+faith_plot <- ggplot(df2, aes(x=tmao_log, y=faith_pd)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -513,14 +532,20 @@ ggplot(df2, aes(x=tmao_log, y=faith_pd)) +
   ylab(y_variable) +
   xlab(x_variable) +
   labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+faith_plot
 
 # Pielou's Evenness
 y_variable <- "Pielou's Evenness"
 x_variable <- "Natural Log of TMAO (uM)"
 mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df2, aes(x=tmao_log, y=pielou_e)) +
+pielou_plot <- ggplot(df2, aes(x=tmao_log, y=pielou_e)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -528,14 +553,20 @@ ggplot(df2, aes(x=tmao_log, y=pielou_e)) +
   ylab(y_variable) +
   xlab(x_variable) +
   labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+pielou_plot
 
 # Observed OTUs
 y_variable <- "Observed OTUs"
 x_variable <- "Natural Log of TMAO (uM)"
 mdn_cut <- log(median(df2$tmao.x))
 # Plot
-ggplot(df2, aes(x=tmao_log, y=observed_otus)) +
+obsOTU_plot <- ggplot(df2, aes(x=tmao_log, y=observed_otus)) +
   geom_point(aes(shape=bmi_cat, color = age_cat)) +
   geom_vline(xintercept = mdn_cut, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE, fullrange = F) +
@@ -543,8 +574,22 @@ ggplot(df2, aes(x=tmao_log, y=observed_otus)) +
   ylab(y_variable) +
   xlab(x_variable) +
   labs(color = "Age bin", shape = "BMI bin") +
-  scale_color_brewer(palette = "Dark2")
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+obsOTU_plot
+```
 
+Save
+
+```{r save alpha diversity plots}
+# Save
+tiff("../../Outputs/plots/microbiome/AlphaDiversity_Shannon_TMAO_2112.tiff", width = 6, height = 4, units = 'in', res = 300)
+shannon_plot
+dev.off()
 ```
 
 # Beta Diversity Analysis
@@ -616,6 +661,71 @@ boxplot(bdis, las = 2)
 adonis2(dismax_bc ~ tmao_log + sex + age + bmi_final.y, data=df, method = "bray", perm=999) # .017
 #adonis2(tmao_log ~ dismax_bc + sex*age + cystatinc_bd1, data=df, method = "bray", perm=999) 
 
+```
+
+## Beta Diversity Plots 
+
+```{r beta diversity plots}
+# Weighted
+betaplot_WU <- plot_ordination(PSOtmao1G, PCoA_WU, 
+                    color="tmao_mdn",
+                    shape = NULL,
+                    axes = 1:2) +
+  scale_color_brewer(palette = "Dark2", labels = c("Below", "Above")) +
+  stat_ellipse(linetype = 1) +
+  labs(color = "TMAO Median Threshold") +
+  theme_minimal() + 
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+betaplot_WU
+
+# Unweighted
+betaplot_UWU <- plot_ordination(PSOtmao1G, PCoA_UnWU, 
+                    color="tmao_mdn",
+                    shape = NULL,
+                    axes = 1:2) +
+  scale_color_brewer(palette = "Dark2", labels = c("Below", "Above")) +
+  stat_ellipse(linetype = 1) +
+  labs(color = "TMAO Median Threshold") +
+  theme_minimal() + 
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+betaplot_UWU
+
+# Bray Curtis
+betaplot_bc <- plot_ordination(PSOtmao1G, PCoA_BC, 
+                    color="tmao_mdn",
+                    shape = NULL,
+                    axes = 1:2) +
+  scale_color_brewer(palette = "Dark2", labels = c("Below", "Above")) +
+  stat_ellipse(linetype = 1) +
+  labs(color = "TMAO Median Threshold") +
+  theme_minimal() + 
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+betaplot_bc
+
+```
+
+Save
+
+```{r save beta diversity plots}
+# Save
+tiff("../../Outputs/plots/microbiome/BetaDiversity_PCoAWU_TMAOmdn_2112.tiff", width = 6, height = 4, units = 'in', res = 300)
+betaplot_WU
+dev.off()
 ```
 
 # ANCOM
