@@ -66,7 +66,7 @@ phen$crp_bd1.mgdL <- phen$crp_bd1 * 0.0001
 ```{r Participant characterisitics}
 # TMAO table by age bin - females
 factorVars <- c("age_cat")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.f <- CreateTableOne(vars = vars,
                                     strata = "age_cat",
                                     data = phen[phen$sex == "Female",],
@@ -75,7 +75,7 @@ table_tmao.f
 
 # TMAO table by age bin - males
 factorVars <- c("age_cat")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.m <- CreateTableOne(vars = vars,
                                     strata = "age_cat",
                                     data = phen[phen$sex == "Male",],
@@ -84,7 +84,7 @@ table_tmao.m
 
 # TMAO table by sex
 factorVars <- c("sex")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.all <- CreateTableOne(vars = vars,
                                     strata = "sex",
                                     data = phen,
@@ -96,13 +96,13 @@ Save the tables
 
 ```{r Save characteristic tables}
 table_save.f <- print(table_tmao.f, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.f, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byAgeBin_211111.csv")
+write.csv(table_save.f, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byAgeBin_211203.csv")
 
 table_save.m <- print(table_tmao.m, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.m, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byAgeBin_211111.csv")
+write.csv(table_save.m, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byAgeBin_211203.csv")
 
 table_save.all <- print(table_tmao.all, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.all, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_bySex_211111.csv")
+write.csv(table_save.all, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_bySex_211203.csv")
 ```
 
 
@@ -149,13 +149,14 @@ phen$tg_bd1_ln <- log(phen$tg_bd1)
 phen$crp_bd1_ln <- log(phen$crp_bd1)
 phen$tnfa_bd1_ln <- log(phen$tnfa_bd1)
 phen$il6_bd1_ln <- log(phen$il6_bd1)
+phen$insulin_bd1_ln <- log(phen$insulin_bd1)
 ```
 
 
 ```{r Participant characterisitics by TMAO quantile}
 # TMAO table by age bin - females
 factorVars <- c("age_cat", "tmao_quantile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.fq <- CreateTableOne(vars = vars,
                                     strata = "tmao_quantile",
                                     data = phen[phen$sex == "Female",],
@@ -164,7 +165,7 @@ table_tmao.fq
 
 # TMAO table by age bin - males
 factorVars <- c("age_cat", "tmao_quantile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.mq <- CreateTableOne(vars = vars,
                                     strata = "tmao_quantile",
                                     data = phen[phen$sex == "Male",],
@@ -173,7 +174,7 @@ table_tmao.mq
 
 # TMAO table by sex
 factorVars <- c("tmao_quantile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.allq <- CreateTableOne(vars = vars,
                                     strata = "tmao_quantile",
                                     data = phen,
@@ -185,13 +186,13 @@ Save
 
 ```{r Save characteristic quantile tables}
 table_save.fq <- print(table_tmao.fq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byTMAOQuantile_211111.csv")
+write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byTMAOQuantile_211203.csv")
 
 table_save.mq <- print(table_tmao.mq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byTMAOQuantile_211111.csv")
+write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byTMAOQuantile_211203.csv")
 
 table_save.allq <- print(table_tmao.allq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOQuantile_211111.csv")
+write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOQuantile_211203.csv")
 ```
 
 Make similar tables but for TMAO tertile 
@@ -199,7 +200,7 @@ Make similar tables but for TMAO tertile
 ```{r Participant characterisitics by TMAO tertile}
 # TMAO table by tmao_tertile - females
 factorVars <- c("age_cat", "tmao_tertile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.ft <- CreateTableOne(vars = vars,
                                     strata = "tmao_tertile",
                                     data = phen[phen$sex == "Female",],
@@ -208,7 +209,7 @@ table_tmao.ft
 
 # TMAO table by tmao_tertile - males
 factorVars <- c("age_cat", "tmao_tertile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.mt <- CreateTableOne(vars = vars,
                                     strata = "tmao_tertile",
                                     data = phen[phen$sex == "Male",], # note 6103 and 7098 have high il6
@@ -216,20 +217,27 @@ table_tmao.mt <- CreateTableOne(vars = vars,
 table_tmao.mt
 
 # TMAO table by tmao_tertile - all, add sex
-factorVars <- c("tmao_tertile")
-vars <- c("age", "sex", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+factorVars <- c("tmao_tertile", "sex")
+vars <- c("age", "sex", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
 table_tmao.allt <- CreateTableOne(vars = vars,
                                     strata = "tmao_tertile",
                                     data = phen,
                                     factorVars = factorVars)
 table_tmao.allt
 
-# Do BH correction
+# Do BH correction for continuous variables
 allt_ContTable <- attr(table_tmao.allt$ContTable, "pValues")
 n <- length(allt_ContTable$pNormal)
 # BH correction
 allt_ContTable$padj <- stats::p.adjust(allt_ContTable$pNormal, method = "BH", n = n) 
 allt_ContTable
+
+# Do BH correction for categorical variables
+allt_CatTable <- attr(table_tmao.allt$CatTable, "pValues")
+n <- 23
+# BH correction
+allt_CatTable$padj <- stats::p.adjust(allt_CatTable$pApprox, method = "BH", n = n) 
+allt_CatTable
 ```
 
 Save 
@@ -255,7 +263,7 @@ Note, we will remove ethnicity in these regressions because when we specifically
 
 ```{r Cardiometabolic Multiple Linear Regression}
 # Transfored variable list
-transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln", "insulin_bd1_ln", "tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
 
 #~~~~~~~~
 # TMAO  
@@ -289,13 +297,13 @@ res$p.adj <- stats::p.adjust(res$P, method = "BH", n = n)
 Save table
 ```{r Save TMAO linear regression table}
 # Save table
-write.csv(res, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_211111.csv")
+write.csv(res, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD.csv")
 ```
 
 ## Females 
 ```{r Cardiometabolic Multiple Linear Regression - Females}
 # Transfored variable list
-transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln",  "insulin_bd1_ln", "tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
 
 #~~~~~~~~
 # TMAO  
@@ -331,7 +339,7 @@ res.f$p.adj <- stats::p.adjust(res.f$P, method = "BH", n = n)
 Save table
 ```{r Save TMAO linear regression table - Females}
 # Save table
-write.csv(res.f, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_females_211112.csv")
+write.csv(res.f, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_females.csv")
 ```
 
 No significant effects found in female only cohort. 
@@ -339,7 +347,7 @@ No significant effects found in female only cohort.
 ## Males 
 ```{r Cardiometabolic Multiple Linear Regression - Males}
 # Transfored variable list
-transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln", "insulin_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log")
 
 #~~~~~~~~
 # TMAO  
@@ -375,7 +383,7 @@ res.m$p.adj <- stats::p.adjust(res.m$P, method = "BH", n = n)
 Save table
 ```{r Save TMAO linear regression table - Males}
 # Save table
-write.csv(res.m, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_males_211112.csv")
+write.csv(res.m, "../../Outputs/tables/CardiometabolicMarkers/MultipleLinReg_TMAO_LCMS_n361_CVD_males.csv")
 ```
 
 No significant effects found in male only cohort. 
@@ -449,7 +457,8 @@ transformed_keep_tbl <- c("sex",
 "T.d_milk_totals_sqrRt",
 "T.d_cheese_totals_sqrRt",
 "T.d_yogurt_totals_Binary",
-"choln_tnfs_log"
+"choln_tnfs_log",
+"hei_asa24_totalscore"
 )
 ```
 
@@ -483,7 +492,7 @@ res_food$p.adj <- stats::p.adjust(res_food$P, method = "BH", n = n)
 Save
 ```{r save food linear regression table}
 # Save table
-write.csv(res_food, "../../Outputs/tables/Diet/MultipleLinReg_TMAO_LCMS_n356_ASA24_211111.csv")
+write.csv(res_food, "../../Outputs/tables/Diet/MultipleLinReg_TMAO_LCMS_n356_ASA24.csv")
 ```
 
 Make TMAO food intake by quantile table
@@ -520,7 +529,6 @@ vars <- c("pf_meat_totals",
           "hei_asa24_totalscore",
           "hei_asa24_totalveg",
           "hei_asa24_sfat",
-          "hei_asa24_",
           "choln_tnfs",
           "age",
           "ethnicity" ,
@@ -552,13 +560,13 @@ table_food.allq
 
 ```{r Save food quantile tables}
 table_save.fq <- print(table_food.fq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Food_Female_byTMAOQuantile_211111.csv")
+write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Food_Female_byTMAOQuantile.csv")
 
 table_save.mq <- print(table_food.mq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Food_Male_byTMAOQuantile_211111.csv")
+write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Food_Male_byTMAOQuantile.csv")
 
 table_save.allq <- print(table_food.allq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOQuantile_211111.csv")
+write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOQuantile.csv")
 ```
 
 TMAO tertile 
@@ -688,6 +696,59 @@ sd(full$hei_asa24_totalscore, na.rm = TRUE)
 summary(full$kcal_tnfs)
 sd(full$kcal_tnfs)
 ```
+
+Median TMAO in the cohort?
+
+```{r TMAO median for paper}
+cat("Summary of fasting plasma TMAO for the full cohort:")
+summary(full$tmao)
+```
+
+What is the average choline intake for males and females?
+```{r Choline intake summary}
+cat("Summary of choline intake in foods and supplements for the full cohort:")
+summary(full$choln_tnfs)
+sd(full$choln_tnfs)
+
+cat("Summary of choline intake in foods and supplements for the female cohort:")
+summary(subset(full, sex == "Female")$choln_tnfs)
+sd(subset(full, sex == "Female")$choln_tnfs)
+
+cat("Summary of choline intake in foods and supplements for the male cohort:")
+summary(subset(full, sex == "Male")$choln_tnfs)
+sd(subset(full, sex == "Male")$choln_tnfs)
+```
+
+Check to see if food intake is different by ethnicity?
+
+```{r food ~ ethnicity - LCMS BD1 - aov 353 ppl}
+# Make a smaller df from master (the old data)
+full_sub <- full[, colnames(full) %in% transformed_keep_tbl]
+
+# Get rid of NAs
+full_sub_na <- full_sub[is.na(full_sub$ethnicity) == FALSE,]
+
+full_sub_na2 <- full_sub_na %>% dplyr::select(sex, kcal_tnfs, age, cystatinc_bd1, ethnicity, tmao, tmao_log, T.pf_seafd_hi_totals_Binary, T.pf_seafd_low_totals_Binary, T.d_yogurt_totals_Binary, everything())
+
+# Loop
+for(i in 11:ncol(full_sub_na2)){
+  column <- names(full_sub_na2[i])
+  aovres <- aov(full_sub_na2[,i] ~ ethnicity, data = full_sub_na2)
+  result <- summary(aovres)
+  tuk <- TukeyHSD(aovres)
+  print(column)
+  print(result)
+  print(tuk)
+}
+
+```
+```
+
+
+
+
+
+
 
 "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln",
 
