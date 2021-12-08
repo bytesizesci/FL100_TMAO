@@ -747,6 +747,39 @@ betaplot_WU
 dev.off()
 ```
 
+Play around with the coloring to try to figure out what is discriminating these groups!
+
+```{r What defines the PCoA groups exploration}
+colnames(sample_data(PSOtmao1G))
+loopPheno <- c("pa_ee_total_mdn","endo_ln_rhi_mdn", "endo_al75_mdn", "betaine_mdn", "carnitine_mdn", "tmao_mdn",  "choline_mdn", "creatinine_mdn", "phosphocholine_mdn", "hei_asa24_totalveg_mdn", "hei_asa24_totalproteinfoods_mdn", "hei_asa24_sodium_mdn", "hei_asa24_refinedgrains_mdn", "hei_asa24_sfat_mdn",  "hei_asa24_addsug_mdn", "hei_asa24_wholegrain_mdn", "hei_asa24_totalscore_mdn", "tmao_log_mdn", "TMAO_5", "TMAO_6", "TMAO_7", "sex", "age_cat", "bmi_cat", "tmao_quantile", "tmao_tertile")   
+
+# PCoA_WU, PCoA_UnWU, PCoA_BC plug in to view
+for(i in 1:length(loopPheno)){
+print(plot_ordination(PSOtmao1G, PCoA_WU, 
+                    color = loopPheno[i],
+                    shape = NULL,
+                    axes = 1:2) +
+  #scale_color_brewer(palette = "Dark2", labels = c("Below", "Above")) +
+  stat_ellipse(linetype = 1) +
+  labs(color = loopPheno[i]) +
+  theme_minimal() + 
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5)))
+}
+
+# From the plots, Weighted UniFrac and endo_al75 and betaine look different
+bdis <- betadisper(dismax_wu, df$betaine_mdn)
+permutest(bdis) # NS, good
+boxplot(bdis, las = 2)
+
+# ADONIS (perMANOVA) analysis
+adonis2(dismax_wu ~ betaine + sex + age + bmi_final.y, data=df, method = "wunifrac", perm=999) # different
+
+```
+
 # ANCOM
 
 ## ANCOM2 no-covariate analysis
