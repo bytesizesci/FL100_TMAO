@@ -1489,6 +1489,118 @@ res_des <- as.data.frame(my_lm361_lcms_cvd_des)
 res_des$p.adj <- stats::p.adjust(res_des$P, method = "BH", n = n) 
 ```
 
+Save for supplemental material
+```{r Save linear regression results with bacteria}
+write.csv(res_des, "../../Outputs/tables/Microbiome/LinReg_cardiometabolic_withDESeq2results.csv")
+saveRDS(res_des, "../../Outputs/tables/Microbiome/LinReg_cardiometabolic_withDESeq2results.Rds")
+```
+
+Is TNF-a related to the gut microbiome directly?
+## Factored by tnfa Tertile 
+
+THIS CHUNK WORK IN PROGRESS
+
+```{r DESeq2 analysis - tnf-a tertile}
+# Quick check
+summary(lm(tnfa_bd1_ln ~ f__Bacteroidaceae_g__Bacteroides, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Peptostreptococcaceae_g__, phen_sub)) # Sig, minor inverse relationship
+summary(lm(tnfa_bd1_ln ~ f__Christensenellaceae_g__, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Lachnospiraceae_g__Butyrivibrio, phen_sub)) # NS
+# With covariates
+summary(lm(tnfa_bd1_ln ~ f__Bacteroidaceae_g__Bacteroides + sex + age + bmi_final, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Peptostreptococcaceae_g__ + sex + age + bmi_final, phen_sub)) # Sig, minor inverse relationship
+summary(lm(tnfa_bd1_ln ~ f__Christensenellaceae_g__ + sex + age + bmi_final, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Lachnospiraceae_g__Butyrivibrio + sex + age + bmi_final, phen_sub)) # NS
+
+# Now see about differential abundance with TNF-a (THIS PART WORK IN PROGRESS)
+# Add TNF-a to PSOtmao1G
+phen_tnfa <- subset(phen, select=c(tnfa_bd1))
+sample_data(PSOtmao1G)$tnfa_bd1 <- merge(sample_data(PSOtmao1G), phen_tnfa, by = 0)
+
+# Add TNF-a tertile
+tnfa_tertile <- quantile(sample_data(PSOtmao1G)$tnfa_bd1, c(0:3/3), na.rm = TRUE)
+sample_data(PSOtmao)$tmao_tertile <- ifelse(sample_data(PSOtmao)$tmao <= tmao_tertile[2], "Tertile1",
+                             ifelse(sample_data(PSOtmao)$tmao > tmao_tertile[2] & sample_data(PSOtmao)$tmao <= tmao_tertile[3], "Tertile2", "Tertile3"))
+# Factor it
+sample_data(PSOtmao)$tmao_tertile = factor(sample_data(PSOtmao)$tmao_tertile)
+# Lookss good
+table(sample_data(PSOtmao)$tmao_tertile)
+
+# DESeq analysis - tmao_tertile
+mb <- phyloseq_to_deseq2(PSOtmao1G, ~ sex + age + bmi_final.x + tmao_tertile)
+mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remove variable of interest here, TMAO
+res.ratio <- results(mb.ratio, contrast = c("tmao_tertile", "Tertile1", "Tertile3")) # Look at most different tertiles
+alpha = 0.05
+sigtab = res.ratio[which(res.ratio$padj < alpha), ]
+sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao1G)[rownames(sigtab), ], "matrix"))
+sigtab$family_genus <- paste0(sigtab$Family, sigtab$Genus)
+head(sigtab)
+
+#~~~~~~~~~~~~~~~
+# Plot Results
+#~~~~~~~~~~~~~~~
+resOTU <- rownames(sigtab)
+otuData <- as.data.frame(otu_table(PSOtmao1G))
+otuData_desRes <- otuData[rownames(otuData) %in% resOTU,]
+#otuData_desRes <- as.data.frame(t(otuData_desRes))
+# Get sample data groupings
+sampleData <- as.data.frame(sample_data(PSOtmao1G))
+sampleData <- subset(sampleData, select = c(tmao_mdn, tmao_quantile, tmao_tertile, tmao))
+# Get tax table
+taxaData <- as.data.frame(tax_table(PSOtmao1G))
+taxaData_res <- taxaData[rownames(taxaData) %in% resOTU,]
+taxaData_res$OrderFamilyGenus <- paste0(taxaData_res$Order, taxaData_res$Family, taxaData_res$Genus)
+
+# Merge
+ggData <- merge(taxaData_res, otuData_desRes, by = 0)
+rownames(ggData) <-  ggData$OrderFamilyGenus
+ggData <- ggData[,-(1:9)]
+ggData <- as.data.frame(t(ggData))
+ggData <- merge(ggData, sampleData, by = 0)
+rownames(ggData) <- ggData[,"Row.names"]
+ggData <- subset(ggData, select = -c(Row.names))
+
+# Loop Plot
+nres <- length(resOTU)
+for (i in 1:nres) { 
+    print(ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
+            geom_boxplot()+
+            ylab(colnames(ggData)[i])) 
+}
+
+#~~~~~~~~~~~~~~~
+# Plot Results Fold Change
+#~~~~~~~~~~~~~~~
+sigtabgen = subset(sigtab, !is.na(Genus))
+# Phylum order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Phylum, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Phylum = factor(as.character(sigtabgen$Phylum), levels=names(x))
+# Genus order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Genus, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Genus = factor(as.character(sigtabgen$Genus), levels=names(x))
+DESeqPlot <- ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) + 
+  geom_vline(xintercept = 0.0, color = "gray", size = 0.5) +
+  geom_point(size=3) + 
+  ylab("Taxonomy") +
+  xlab("Log2 Fold Change") + 
+  scale_color_brewer(palette = "Paired") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+DESeqPlot
+
+# Save
+tiff("../../Outputs/plots/microbiome/DESeq2_Genus_tnfa_TMAOTertile1v3_2112.tiff", width = 8, height = 3, units = 'in', res = 300)
+DESeqPlot
+dev.off()
+```
+
 The family christensenellaceae is widely inversely associated with BMI. A review is [here](https://bmcbiol.biomedcentral.com/articles/10.1186/s12915-019-0699-4).
 
 ```{r Christensenellaceae genus and BMI}
