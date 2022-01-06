@@ -895,6 +895,13 @@ sd(full$pf_total_totals)
 summary(full$pf_mps_total_totals)
 sd(full$pf_mps_total_totals)
 
+# Total of meat, poultry, seafood, organ meat, and cured meat (oz. eq.) - MALES
+summary(full$pf_mps_total_totals[full$sex == "Male"])
+sd(full$pf_mps_total_totals[full$sex == "Male"])
+# Total of meat, poultry, seafood, organ meat, and cured meat (oz. eq.) - FEMALES
+summary(full$pf_mps_total_totals[full$sex == "Female"])
+sd(full$pf_mps_total_totals[full$sex == "Female"])
+
 # Eggs (chicken, duck, goose, quail) and egg substitutes (oz. eq.)
 summary(full$pf_eggs_totals)
 sd(full$pf_eggs_totals)
