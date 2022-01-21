@@ -30,6 +30,8 @@ output:
 2) [Workflow for Microbiome Data Analysis: from raw reads to community analyses](https://bioconductor.org/help/course-materials/2017/BioC2017/Day1/Workshops/Microbiome/MicrobiomeWorkflowII.html#different_ordination_projections)
 3) [Example of what descriptive microbiome stats to report in the results](https://pubmed.ncbi.nlm.nih.gov/28407784/)
 
+**Updates:**
+On 01-19-2022 I reran many of the analyses with the upadted phyloseq object PSOtmao_NA to see if my results were consistent. I saved this markdown to the update-taxonomy-table branch of the GitHub FL100_TMAO project. Background - When MK was reading my manuscript, she noticed that I have some entries in the taxonomy table that say NA and some that say "g__" or "f__". While these may have different meanings, she suggests simply changing all cases to NA. (Another solution, you could manually differentaite "g__" to "g__ASV1" so that the glomming isn't wrong). 
 
 # Set Up
 
@@ -42,7 +44,9 @@ library(vegan)
 ```
 
 ```{r Load phyloseq object}
-load("../../data/processed/microbiome/phyloseq_objects/PSOtmao_211108.RData") #PSOtmao
+#load("../../data/processed/microbiome/phyloseq_objects/PSOtmao_211108.RData") #PSOtmao
+load(file = "../../data/processed/microbiome/phyloseq_objects/PSOtmao_220119.RData") #PSOtmao_NA
+PSOtmao <- PSOtmao_NA
 ```
 
 ```{r Add meta data to phyloseq object}
@@ -260,7 +264,7 @@ plot.composition.relAbun <- microbiome::plot_composition(ps1F.10.family.comp,
 plot.composition.relAbun
 
 # Save
-tiff("../../Outputs/plots/microbiome/RelAbund_Fam_TMAOTertiles_2111.tiff", width = 4, height = 4, units = 'in', res = 300)
+tiff("../../Outputs/plots/microbiome/RelAbund_Fam_TMAOTertiles_2201.tiff", width = 5, height = 4, units = 'in', res = 300)
 plot.composition.relAbun
 dev.off()
 ```
@@ -297,14 +301,14 @@ mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remov
 res.ratio <- results(mb.ratio)
 alpha = 0.05
 alpha.big = 0.5
-sigtab = res.ratio[which(res.ratio$padj < alpha.big), ]
+sigtab = res.ratio[which(res.ratio$padj < alpha), ]
 sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao1G)[rownames(sigtab), ], "matrix"))
 sigtab$family_genus <- paste0(sigtab$Family, sigtab$Genus)
 head(sigtab)
 
 ```
 
-No results when we look at TMAO median and control for age, sex, and BMI.
+results when we look at TMAO median and control for age, sex, and BMI.
 
 ## Factored by TMAO Tertile 
 
@@ -379,14 +383,15 @@ DESeqPlot <- ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylu
 DESeqPlot
 
 # Save
-tiff("../../Outputs/plots/microbiome/DESeq2_Genus_TMAOTertile1v3_2112.tiff", width = 8, height = 3, units = 'in', res = 300)
+tiff("../../Outputs/plots/microbiome/DESeq2_Genus_TMAOTertile1v3_2201.tiff", width = 8, height = 3, units = 'in', res = 300)
 DESeqPlot
 dev.off()
 ```
 Save
 
 ```{r save deseq2 tmao tertile results}
-write.csv(sigtabgen, "../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile.csv")
+#write.csv(sigtabgen, "../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile_2112.csv")
+write.csv(sigtabgen, "../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile_220119.csv")
 ```
 
 ## Factored by TMAO Quantile 
@@ -617,25 +622,35 @@ dismax_bc = phyloseq::distance(PSOtmao1G, method="bray", type = "samples")
 Save
 
 ```{r save beta matrices}
-save(PCoA_WU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_WU.RData")
-save(PCoA_UnWU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_UnWU.RData")
-save(PCoA_BC, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_BC.RData")
+# Outdated
+#save(PCoA_WU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_WU.RData")
+#save(PCoA_UnWU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_UnWU.RData")
+#save(PCoA_BC, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_BC.RData")
 
-save(dismax_wu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_WU.RData")
-save(dismax_uwu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_UWU.RData")
-save(dismax_bc, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_BC.RData")
+#save(dismax_wu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_WU.RData")
+#save(dismax_uwu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_UWU.RData")
+#save(dismax_bc, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_BC.RData")
+
+# With updated taxonomy table and from PSOtmaoNA
+save(PCoA_WU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_WU_220119.RData")
+save(PCoA_UnWU, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_UnWU_220119.RData")
+save(PCoA_BC, file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_BC_220119.RData")
+
+save(dismax_wu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_WU_220119.RData")
+save(dismax_uwu, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_UWU_220119.RData")
+save(dismax_bc, file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_BC_220119.RData")
 ```
 
 Load
 
 ```{r Load bdiversity calculations}
-load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_WU.RData")
-load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_UnWU.RData")
-load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_BC.RData")
+load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_WU_220119.RData")
+load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_UnWU_220119.RData")
+load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_PCoA_BC_220119.RData")
 
-load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_WU.RData")
-load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_UWU.RData")
-load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_BC.RData")
+load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_WU_220119.RData")
+load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_UWU_220119.RData")
+load(file = "../../data/processed/microbiome/diversity/PSOtmao1G_dismax_BC_220119.RData")
 
 ```
 
@@ -653,7 +668,7 @@ permutest(bdis) # NS, good
 boxplot(bdis, las = 2)
 
 # ADONIS (perMANOVA) analysis
-adonis2(dismax_wu ~ tmao_log + sex + age + bmi_final.y, data=df, method = "wunifrac", perm=999) # .025
+adonis2(dismax_wu ~ tmao_log + sex + age + bmi_final.y, data=df, method = "wunifrac", perm=999) # .076
 #adonis2(tmao_log ~ dismax_wu + sex*age + cystatinc_bd1, data=df, method = "wunifrac", perm=999) 
 
 #~~~~~~~~~~~
@@ -673,7 +688,7 @@ adonis2(dismax_uwu ~ tmao_log + sex + age + bmi_final.y, data=df, method = "unif
 #~~~~~~~~~~~
 # Beta dispersion
 bdis <- betadisper(dismax_bc, df$tmao_mdn)
-permutest(bdis) # NS, good
+permutest(bdis) # .04
 boxplot(bdis, las = 2)
 
 # ADONIS (perMANOVA) analysis
@@ -707,7 +722,7 @@ betaplot_UWU <- plot_ordination(PSOtmao1G, PCoA_UnWU,
                     color="tmao_mdn",
                     shape = NULL,
                     axes = 1:2) +
-  #scale_color_brewer(palette = "Dark2", labels = c("Below", "Above")) +
+  scale_color_brewer(palette = "Dark2", labels = c("Below", "Above")) +
   stat_ellipse(linetype = 1) +
   labs(color = "TMAO Median Threshold") +
   theme_minimal() + 
@@ -742,8 +757,15 @@ Save
 
 ```{r save beta diversity plots}
 # Save
-tiff("../../Outputs/plots/microbiome/BetaDiversity_PCoAWU_TMAOmdn_2112.tiff", width = 6, height = 4, units = 'in', res = 300)
+#tiff("../../Outputs/plots/microbiome/BetaDiversity_PCoAWU_TMAOmdn_2112.tiff", width = 6, height = 4, units = 'in', res = 300)
+tiff("../../Outputs/plots/microbiome/BetaDiversity_PCoA_WU_TMAOmdn_2201.tiff", width = 6, height = 4, units = 'in', res = 300)
 betaplot_WU
+dev.off()
+
+# unweighted
+#tiff("../../Outputs/plots/microbiome/BetaDiversity_PCoAWU_TMAOmdn_2112.tiff", width = 6, height = 4, units = 'in', res = 300)
+tiff("../../Outputs/plots/microbiome/BetaDiversity_PCoA_UWU_TMAOmdn_2201.tiff", width = 6, height = 4, units = 'in', res = 300)
+betaplot_UWU
 dev.off()
 ```
 
@@ -1348,10 +1370,172 @@ head(prevalence_tert3[order(prevalence_tert3$TotalAbundance, decreasing= TRUE),]
 
 Save
 
-```{r Save tertile prevalence csv}
-write.csv(prevalence_tert1, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile1.csv")
-write.csv(prevalence_tert2, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile2.csv")
-write.csv(prevalence_tert3, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile3.csv")
+```{r Save Genus tertile prevalence csv}
+write.csv(prevalence_tert1, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile1_2201.csv")
+write.csv(prevalence_tert2, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile2_2201.csv")
+write.csv(prevalence_tert3, "../../Outputs/tables/Microbiome/Prevalence_Genus_Tertile3_2201.csv")
+```
+
+# Family Level Analysis
+
+Repeat TMAO analyses at the Family Level
+
+```{r Family Level}
+# Agglomerate taxa
+PSOtmao1F = tax_glom(PSOtmao1, "Family", NArm = TRUE)
+
+# Now subset at the genus level to identify the most common genus
+# Subset by tertiles (Genus)
+PSOtmao1F_tertile1 <- subset_samples(PSOtmao1F, tmao_tertile == "Tertile1")
+PSOtmao1F_tertile2 <- subset_samples(PSOtmao1F, tmao_tertile == "Tertile2")
+PSOtmao1F_tertile3 <- subset_samples(PSOtmao1F, tmao_tertile == "Tertile3")
+
+#~~~~~~~~~~
+# Tertile 1
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalenceF_tert1 = apply(X = otu_table(PSOtmao1F_tertile1),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1F_tertile1), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalenceF_tert1 = data.frame(Prevalence = prevalenceF_tert1,
+                    TotalAbundance = taxa_sums(PSOtmao1F_tertile1), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1F_tertile1))
+
+
+#~~~~~~~~~~
+# Tertile 2
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalenceF_tert2 = apply(X = otu_table(PSOtmao1F_tertile2),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1F_tertile2), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalenceF_tert2 = data.frame(Prevalence = prevalenceF_tert2,
+                    TotalAbundance = taxa_sums(PSOtmao1F_tertile2), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1F_tertile2))
+#~~~~~~~~~~
+# Tertile 3
+#~~~~~~~~~~
+# Prevalence - how many samples the taxa is observed in
+prevalenceF_tert3 = apply(X = otu_table(PSOtmao1F_tertile3),
+               MARGIN = ifelse(taxa_are_rows(PSOtmao1F_tertile3), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+prevalenceF_tert3 = data.frame(Prevalence = prevalenceF_tert3,
+                    TotalAbundance = taxa_sums(PSOtmao1F_tertile3), # the total number of occurrences (even if only observed 50 times in 1 sample, the number would be 50)
+                    tax_table(PSOtmao1F_tertile3))
+```
+
+```{r Save Family tertile prevalence csv}
+write.csv(prevalenceF_tert1, "../../Outputs/tables/Microbiome/Prevalence_Family_Tertile1_2201.csv")
+write.csv(prevalenceF_tert2, "../../Outputs/tables/Microbiome/Prevalence_Family_Tertile2_2201.csv")
+write.csv(prevalenceF_tert3, "../../Outputs/tables/Microbiome/Prevalence_Family_Tertile3_2201.csv")
+```
+
+```{r DESeq2 analysis Family - TMAO tertile}
+# DESeq analysis - tmao_tertile
+mb <- phyloseq_to_deseq2(PSOtmao1F, ~ sex + age + bmi_final.x + tmao_tertile)
+mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remove variable of interest here, TMAO
+res.ratio <- results(mb.ratio, contrast = c("tmao_tertile", "Tertile1", "Tertile3")) # Look at most different tertiles
+alpha = 0.05
+sigtab = res.ratio[which(res.ratio$padj < alpha), ]
+sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao1F)[rownames(sigtab), ], "matrix"))
+sigtab$order_family <- paste0(sigtab$Order, sigtab$Family)
+head(sigtab)
+
+#~~~~~~~~~~~~~~~
+# Plot Results
+#~~~~~~~~~~~~~~~
+resOTU <- rownames(sigtab)
+otuData <- as.data.frame(otu_table(PSOtmao1F))
+otuData_desRes <- otuData[rownames(otuData) %in% resOTU,]
+#otuData_desRes <- as.data.frame(t(otuData_desRes))
+# Get sample data groupings
+sampleData <- as.data.frame(sample_data(PSOtmao1F))
+sampleData <- subset(sampleData, select = c(tmao_mdn, tmao_quantile, tmao_tertile, tmao))
+# Get tax table
+taxaData <- as.data.frame(tax_table(PSOtmao1F))
+taxaData_res <- taxaData[rownames(taxaData) %in% resOTU,]
+taxaData_res$OrderFamily <- paste0(taxaData_res$Order, taxaData_res$Family)
+
+# Merge
+ggData <- merge(taxaData_res, otuData_desRes, by = 0)
+rownames(ggData) <-  ggData$OrderFamily
+ggData <- ggData[,-(1:9)]
+ggData <- as.data.frame(t(ggData))
+ggData <- merge(ggData, sampleData, by = 0)
+rownames(ggData) <- ggData[,"Row.names"]
+ggData <- subset(ggData, select = -c(Row.names))
+
+# Loop Plot
+nres <- length(resOTU)
+for (i in 1:nres) { 
+    print(ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
+            geom_boxplot(aes(color=tmao_tertile)) +
+            geom_point() +
+            theme_minimal() +
+            ylab(paste0("Log of", colnames(ggData[i]))) +
+            xlab("TMAO Tertile") +
+            scale_color_brewer(palette = "Dark2") +
+            labs(color = "TMAO Tertile")
+    )
+}
+
+# Loop Plot
+nres <- length(resOTU)
+for (i in 1:nres) { 
+    temp_plot <- ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
+            geom_boxplot(aes(color=tmao_tertile)) +
+            geom_point() +
+            theme_minimal() +
+            ylab(paste0("Log of", colnames(ggData[i]))) +
+            xlab("TMAO Tertile") +
+            scale_color_brewer(palette = "Dark2") +
+            labs(color = "TMAO Tertile")
+    tiff(paste0("../../Outputs/plots/microbiome/DESeq2_Family_TMAOTertile_Boxplot_", i,"_2201.tiff"), width = 4, height = 4, units = 'in', res = 300)
+    print(temp_plot)
+    dev.off()
+}
+
+
+#~~~~~~~~~~~~~~~
+# Plot Results Fold Change
+#~~~~~~~~~~~~~~~
+sigtabgen = subset(sigtab, !is.na(Family))
+# Phylum order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Phylum, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Phylum = factor(as.character(sigtabgen$Phylum), levels=names(x))
+# Genus order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Family, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Family = factor(as.character(sigtabgen$Family), levels=names(x))
+DESeqPlot <- ggplot(sigtabgen, aes(y=order_family, x=log2FoldChange, color=Phylum)) + 
+  geom_vline(xintercept = 0.0, color = "gray", size = 0.5) +
+  geom_point(size=3) + 
+  ylab("Taxonomy") +
+  xlab("Log2 Fold Change") + 
+  scale_color_brewer(palette = "Paired") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12), # x and y axis text size
+        axis.title = element_text(size = 12), # x and y label text size
+        legend.text = element_text(size = 12), # legend text size
+        legend.title = element_text(size = 12), # label legend text size
+        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+DESeqPlot
+
+# Save
+tiff("../../Outputs/plots/microbiome/DESeq2_Family_TMAOTertile1v3_2201.tiff", width = 8, height = 3, units = 'in', res = 300)
+DESeqPlot
+dev.off()
+```
+Save
+
+```{r save deseq2 Family tmao tertile results}
+#write.csv(sigtabgen, "../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile_2112.csv")
+write.csv(sigtabgen, "../../Outputs/tables/Microbiome/DESeq2_PSOtmao1F_TMAOTertile_220120.csv")
 ```
 
 # Correlate Fecal Microbiome with Phenos
@@ -1361,16 +1545,24 @@ Now that we identified microbiome characteristics that are relevant to TMAO, ask
 1) Improve the variance explained between TMAO and a given cardiometabolic marker
 2) Correlate to cardiometabolic phenos
 
-```{r Get the microbiome data ready to combine with pheno data}
-da <- read.csv("../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile.csv", row.names = 1)
+```{r Get the genus microbiome data ready to combine with pheno data}
+da <- read.csv("../../Outputs/tables/Microbiome/DESeq2_PSOtmao1G_TMAOTertile_220119.csv", row.names = 1)
+taxaName_famgen <- da[,"family_genus", drop = F]
+taxaName_famgen
 resOTU <- rownames(da)
 otuData <- as.data.frame(otu_table(PSOtmao1G))
 otuData_desRes <- otuData[rownames(otuData) %in% resOTU,]
 otuData_desRes <- as.data.frame(t(otuData_desRes))
 # rename for ease downstream
-names(otuData_desRes)[names(otuData_desRes) == "bb1b75f41ff9c9db1d1de41e8388eb52"] <- "f__Bacteroidaceae_g__Bacteroides"
-names(otuData_desRes)[names(otuData_desRes) == "b180a2455b236c103cf0bfe620095736"] <- "f__Peptostreptococcaceae_g__"
-names(otuData_desRes)[names(otuData_desRes) == "e1a2800b24cdf9779b28dc897cddb12a"] <- "f__Christensenellaceae_g__"
+#names(otuData_desRes)[names(otuData_desRes) == "bb1b75f41ff9c9db1d1de41e8388eb52"] <- "f__Bacteroidaceae_g__Bacteroides"
+#names(otuData_desRes)[names(otuData_desRes) == "b180a2455b236c103cf0bfe620095736"] <- "f__Peptostreptococcaceae_g__"
+#names(otuData_desRes)[names(otuData_desRes) == "e1a2800b24cdf9779b28dc897cddb12a"] <- "f__Christensenellaceae_g__"
+#names(otuData_desRes)[names(otuData_desRes) == "8f5ceded1cd7e86b8271d3fab24d322a"] <- "f__Lachnospiraceae_g__Butyrivibrio"
+
+# Update PSOtmao_NA results
+names(otuData_desRes)[names(otuData_desRes) == "a0798db0c868e9ad6089502956d68d87"] <- "f__Erysipelotrichaceae_g__Catenibacterium"
+names(otuData_desRes)[names(otuData_desRes) == "c5859b7f5d14b8c145fbc3ad583c70e8"] <- "f__Erysipelotrichaceae_g__Coprobacillus"
+names(otuData_desRes)[names(otuData_desRes) == "5c4ca852b40641b3eb0ad23e69bb6583"] <- "f__Lachnospiraceae_g__Roseburia"
 names(otuData_desRes)[names(otuData_desRes) == "8f5ceded1cd7e86b8271d3fab24d322a"] <- "f__Lachnospiraceae_g__Butyrivibrio"
 ```
 
@@ -1428,18 +1620,23 @@ phen <- subset(phen, select = -c(Row.names))
 
 Run the regression!
 
+Old results:
 f__Bacteroidaceae_g__Bacteroides + f__Peptostreptococcaceae_g__ + f__Christensenellaceae_g__ + f__Lachnospiraceae_g__Butyrivibrio
+
+New results:
+f__Erysipelotrichaceae_g__Catenibacterium + f__Erysipelotrichaceae_g__Coprobacillus + f__Lachnospiraceae_g__Roseburia + f__Lachnospiraceae_g__Butyrivibrio
 
 ```{r Cardiometabolic + Microbiome Multiple Linear Regression}
 # Transfored variable list
-transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log", "f__Bacteroidaceae_g__Bacteroides", "f__Peptostreptococcaceae_g__", "f__Christensenellaceae_g__", "f__Lachnospiraceae_g__Butyrivibrio")
+transformed_keep_cardio_tbl <- c("sex", "age","bmi_final", "ethnicity", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln", "cystatinc_bd1", "choline", "betaine", "carnitine","tmao_log", "f__Erysipelotrichaceae_g__Catenibacterium", "f__Erysipelotrichaceae_g__Coprobacillus", "f__Lachnospiraceae_g__Roseburia", "f__Lachnospiraceae_g__Butyrivibrio")
 
 #~~~~~~~~
 # TMAO  
 #~~~~~~~~
 # Make a smaller df from master (the old data)
 phen_sub <- phen[, colnames(phen) %in% transformed_keep_cardio_tbl]
-cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Bacteroidaceae_g__Bacteroides, f__Peptostreptococcaceae_g__, f__Christensenellaceae_g__, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
+#cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Bacteroidaceae_g__Bacteroides, f__Peptostreptococcaceae_g__, f__Christensenellaceae_g__, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
+cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Erysipelotrichaceae_g__Catenibacterium, f__Erysipelotrichaceae_g__Coprobacillus, f__Lachnospiraceae_g__Roseburia, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
 n <- ncol(cvd_biomark)
 
 # LCMS method
@@ -1467,12 +1664,13 @@ res$p.adj <- stats::p.adjust(res$P, method = "BH", n = n)
 #~~~~~~~~
 # Make a smaller df from master (the old data)
 phen_sub <- phen[, colnames(phen) %in% transformed_keep_cardio_tbl]
-cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Bacteroidaceae_g__Bacteroides, f__Peptostreptococcaceae_g__, f__Christensenellaceae_g__, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
+#cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Bacteroidaceae_g__Bacteroides, f__Peptostreptococcaceae_g__, f__Christensenellaceae_g__, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
+cvd_biomark <- subset(phen_sub, select = -c(sex, age, ethnicity, cystatinc_bd1, tmao_log, f__Erysipelotrichaceae_g__Catenibacterium, f__Erysipelotrichaceae_g__Coprobacillus, f__Lachnospiraceae_g__Roseburia, f__Lachnospiraceae_g__Butyrivibrio)) # change variable here
 n <- ncol(cvd_biomark)
 
 # LCMS method
 # Run linear model
-my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + sex + age + cystatinc_bd1 + f__Bacteroidaceae_g__Bacteroides + f__Peptostreptococcaceae_g__ + f__Christensenellaceae_g__ + f__Lachnospiraceae_g__Butyrivibrio, phen_sub )) # add bugs
+my_lm <- lapply(1:n, function(x) lm(cvd_biomark[,x] ~ tmao_log + sex + age + cystatinc_bd1 + f__Erysipelotrichaceae_g__Catenibacterium + f__Erysipelotrichaceae_g__Coprobacillus + f__Lachnospiraceae_g__Roseburia + f__Lachnospiraceae_g__Butyrivibrio, phen_sub )) # add bugs
 
 # Organize results
 my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
@@ -1491,8 +1689,8 @@ res_des$p.adj <- stats::p.adjust(res_des$P, method = "BH", n = n)
 
 Save for supplemental material
 ```{r Save linear regression results with bacteria}
-write.csv(res_des, "../../Outputs/tables/Microbiome/LinReg_cardiometabolic_withDESeq2results.csv")
-saveRDS(res_des, "../../Outputs/tables/Microbiome/LinReg_cardiometabolic_withDESeq2results.Rds")
+write.csv(res_des, "../../Outputs/tables/Microbiome/LinReg_cardiometabolic_withDESeq2results_2201.csv")
+saveRDS(res_des, "../../Outputs/tables/Microbiome/LinReg_cardiometabolic_withDESeq2results_2201.Rds")
 ```
 
 Is TNF-a related to the gut microbiome directly?
@@ -1502,108 +1700,27 @@ THIS CHUNK WORK IN PROGRESS
 
 ```{r DESeq2 analysis - tnf-a tertile}
 # Quick check
-summary(lm(tnfa_bd1_ln ~ f__Bacteroidaceae_g__Bacteroides, phen_sub)) # NS
-summary(lm(tnfa_bd1_ln ~ f__Peptostreptococcaceae_g__, phen_sub)) # Sig, minor inverse relationship
-summary(lm(tnfa_bd1_ln ~ f__Christensenellaceae_g__, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Erysipelotrichaceae_g__Catenibacterium, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Erysipelotrichaceae_g__Coprobacillus, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Lachnospiraceae_g__Roseburia, phen_sub)) # NS
 summary(lm(tnfa_bd1_ln ~ f__Lachnospiraceae_g__Butyrivibrio, phen_sub)) # NS
 # With covariates
-summary(lm(tnfa_bd1_ln ~ f__Bacteroidaceae_g__Bacteroides + sex + age + bmi_final, phen_sub)) # NS
-summary(lm(tnfa_bd1_ln ~ f__Peptostreptococcaceae_g__ + sex + age + bmi_final, phen_sub)) # Sig, minor inverse relationship
-summary(lm(tnfa_bd1_ln ~ f__Christensenellaceae_g__ + sex + age + bmi_final, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Erysipelotrichaceae_g__Catenibacterium + sex + age + bmi_final, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Erysipelotrichaceae_g__Coprobacillus + sex + age + bmi_final, phen_sub)) # NS
+summary(lm(tnfa_bd1_ln ~ f__Lachnospiraceae_g__Roseburia + sex + age + bmi_final, phen_sub)) # NS
 summary(lm(tnfa_bd1_ln ~ f__Lachnospiraceae_g__Butyrivibrio + sex + age + bmi_final, phen_sub)) # NS
 
-# Now see about differential abundance with TNF-a (THIS PART WORK IN PROGRESS)
-# Add TNF-a to PSOtmao1G
-phen_tnfa <- subset(phen, select=c(tnfa_bd1))
-sample_data(PSOtmao1G)$tnfa_bd1 <- merge(sample_data(PSOtmao1G), phen_tnfa, by = 0)
-
-# Add TNF-a tertile
-tnfa_tertile <- quantile(sample_data(PSOtmao1G)$tnfa_bd1, c(0:3/3), na.rm = TRUE)
-sample_data(PSOtmao)$tmao_tertile <- ifelse(sample_data(PSOtmao)$tmao <= tmao_tertile[2], "Tertile1",
-                             ifelse(sample_data(PSOtmao)$tmao > tmao_tertile[2] & sample_data(PSOtmao)$tmao <= tmao_tertile[3], "Tertile2", "Tertile3"))
-# Factor it
-sample_data(PSOtmao)$tmao_tertile = factor(sample_data(PSOtmao)$tmao_tertile)
-# Lookss good
-table(sample_data(PSOtmao)$tmao_tertile)
-
-# DESeq analysis - tmao_tertile
-mb <- phyloseq_to_deseq2(PSOtmao1G, ~ sex + age + bmi_final.x + tmao_tertile)
-mb.ratio <- DESeq(mb, test = "LRT", reduced = ~ sex + age + bmi_final.x) # remove variable of interest here, TMAO
-res.ratio <- results(mb.ratio, contrast = c("tmao_tertile", "Tertile1", "Tertile3")) # Look at most different tertiles
-alpha = 0.05
-sigtab = res.ratio[which(res.ratio$padj < alpha), ]
-sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(PSOtmao1G)[rownames(sigtab), ], "matrix"))
-sigtab$family_genus <- paste0(sigtab$Family, sigtab$Genus)
-head(sigtab)
-
-#~~~~~~~~~~~~~~~
-# Plot Results
-#~~~~~~~~~~~~~~~
-resOTU <- rownames(sigtab)
-otuData <- as.data.frame(otu_table(PSOtmao1G))
-otuData_desRes <- otuData[rownames(otuData) %in% resOTU,]
-#otuData_desRes <- as.data.frame(t(otuData_desRes))
-# Get sample data groupings
-sampleData <- as.data.frame(sample_data(PSOtmao1G))
-sampleData <- subset(sampleData, select = c(tmao_mdn, tmao_quantile, tmao_tertile, tmao))
-# Get tax table
-taxaData <- as.data.frame(tax_table(PSOtmao1G))
-taxaData_res <- taxaData[rownames(taxaData) %in% resOTU,]
-taxaData_res$OrderFamilyGenus <- paste0(taxaData_res$Order, taxaData_res$Family, taxaData_res$Genus)
-
-# Merge
-ggData <- merge(taxaData_res, otuData_desRes, by = 0)
-rownames(ggData) <-  ggData$OrderFamilyGenus
-ggData <- ggData[,-(1:9)]
-ggData <- as.data.frame(t(ggData))
-ggData <- merge(ggData, sampleData, by = 0)
-rownames(ggData) <- ggData[,"Row.names"]
-ggData <- subset(ggData, select = -c(Row.names))
-
-# Loop Plot
-nres <- length(resOTU)
-for (i in 1:nres) { 
-    print(ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
-            geom_boxplot()+
-            ylab(colnames(ggData)[i])) 
-}
-
-#~~~~~~~~~~~~~~~
-# Plot Results Fold Change
-#~~~~~~~~~~~~~~~
-sigtabgen = subset(sigtab, !is.na(Genus))
-# Phylum order
-x = tapply(sigtabgen$log2FoldChange, sigtabgen$Phylum, function(x) max(x))
-x = sort(x, TRUE)
-sigtabgen$Phylum = factor(as.character(sigtabgen$Phylum), levels=names(x))
-# Genus order
-x = tapply(sigtabgen$log2FoldChange, sigtabgen$Genus, function(x) max(x))
-x = sort(x, TRUE)
-sigtabgen$Genus = factor(as.character(sigtabgen$Genus), levels=names(x))
-DESeqPlot <- ggplot(sigtabgen, aes(y=family_genus, x=log2FoldChange, color=Phylum)) + 
-  geom_vline(xintercept = 0.0, color = "gray", size = 0.5) +
-  geom_point(size=3) + 
-  ylab("Taxonomy") +
-  xlab("Log2 Fold Change") + 
-  scale_color_brewer(palette = "Paired") +
-  theme_minimal() +
-  theme(axis.text = element_text(size = 12), # x and y axis text size
-        axis.title = element_text(size = 12), # x and y label text size
-        legend.text = element_text(size = 12), # legend text size
-        legend.title = element_text(size = 12), # label legend text size
-        axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
-
-DESeqPlot
-
-# Save
-tiff("../../Outputs/plots/microbiome/DESeq2_Genus_tnfa_TMAOTertile1v3_2112.tiff", width = 8, height = 3, units = 'in', res = 300)
-DESeqPlot
-dev.off()
 ```
 
 The family christensenellaceae is widely inversely associated with BMI. A review is [here](https://bmcbiol.biomedcentral.com/articles/10.1186/s12915-019-0699-4).
 
-```{r Christensenellaceae genus and BMI}
-summary(lm(f__Christensenellaceae_g__ ~ bmi_final + sex + age, phen))
-```
 
+```{r Christensenellaceae family and BMI}
+# Note = ggData is the family level DESeq results 
+fam_res <- merge(ggData, phen, by = 0)
+rownames(fam_res) <- fam_res[,"Row.names"]
+fam_res <- fam_res[,-1]
+colnames(fam_res) <- gsub(" ", "_", colnames(fam_res))
+
+summary(lm(`_o__Clostridiales_f__Christensenellaceae` ~ bmi_final + sex + age, fam_res))
+```
