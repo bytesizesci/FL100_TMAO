@@ -336,23 +336,51 @@ sampleData <- subset(sampleData, select = c(tmao_mdn, tmao_quantile, tmao_tertil
 # Get tax table
 taxaData <- as.data.frame(tax_table(PSOtmao1G))
 taxaData_res <- taxaData[rownames(taxaData) %in% resOTU,]
-taxaData_res$OrderFamilyGenus <- paste0(taxaData_res$Order, taxaData_res$Family, taxaData_res$Genus)
+taxaData_res$FamilyGenus <- paste0(taxaData_res$Family, taxaData_res$Genus)
 
 # Merge
 ggData <- merge(taxaData_res, otuData_desRes, by = 0)
-rownames(ggData) <-  ggData$OrderFamilyGenus
+rownames(ggData) <-  ggData$FamilyGenus
 ggData <- ggData[,-(1:9)]
 ggData <- as.data.frame(t(ggData))
 ggData <- merge(ggData, sampleData, by = 0)
 rownames(ggData) <- ggData[,"Row.names"]
 ggData <- subset(ggData, select = -c(Row.names))
+# Save a copy of results for plotting
+ggData_G <- ggData
 
-# Loop Plot
+# Loop Plot to view
 nres <- length(resOTU)
+comparisons <- list(c("Tertile1", "Tertile2"), c("Tertile1", "Tertile3"), c("Tertile2","Tertile3"))
 for (i in 1:nres) { 
-    print(ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
-            geom_boxplot()+
-            ylab(colnames(ggData)[i])) 
+    print(ggplot(ggData_G, aes(x = tmao_tertile, y = log(ggData_G[,i]))) +
+            geom_boxplot(aes(color=tmao_tertile)) +
+            geom_point() +
+            theme_minimal() +
+            ylab(paste0("Log of", colnames(ggData_G[i]))) +
+            xlab("TMAO Tertile") +
+            scale_color_brewer(palette = "Dark2") +
+            labs(color = "TMAO Tertile") +
+            stat_compare_means(comparisons=comparisons)
+    )
+}
+
+# Loop Plot to save
+nres <- length(resOTU)
+comparisons <- list(c("Tertile1", "Tertile2"), c("Tertile1", "Tertile3"), c("Tertile2","Tertile3"))
+for (i in 1:nres) { 
+    temp_plot <- ggplot(ggData_G, aes(x = tmao_tertile, y = log(ggData_G[,i]))) +
+            geom_boxplot(aes(color=tmao_tertile)) +
+            geom_point() +
+            theme_minimal() +
+            ylab(paste0("Log of \n", colnames(ggData_G[i]))) +
+            xlab("TMAO Tertile") +
+            scale_color_brewer(palette = "Dark2") +
+            labs(color = "TMAO Tertile") 
+            #stat_compare_means(comparisons=comparisons)
+    tiff(paste0("../../Outputs/plots/microbiome/DESeq2_Genus_TMAOTertile_Boxplot_", i,"_2201.tiff"), width = 4, height = 4, units = 'in', res = 300)
+    print(temp_plot)
+    dev.off()
 }
 
 #~~~~~~~~~~~~~~~
@@ -1467,29 +1495,31 @@ ggData <- as.data.frame(t(ggData))
 ggData <- merge(ggData, sampleData, by = 0)
 rownames(ggData) <- ggData[,"Row.names"]
 ggData <- subset(ggData, select = -c(Row.names))
+# Save a copy of results for plotting
+ggData_F <- ggData
 
-# Loop Plot
+# Loop Plot to view
 nres <- length(resOTU)
 for (i in 1:nres) { 
-    print(ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
+    print(ggplot(ggData_F, aes(x = tmao_tertile, y = log(ggData_F[,i]))) +
             geom_boxplot(aes(color=tmao_tertile)) +
             geom_point() +
             theme_minimal() +
-            ylab(paste0("Log of", colnames(ggData[i]))) +
+            ylab(paste0("Log of", colnames(ggData_F[i]))) +
             xlab("TMAO Tertile") +
             scale_color_brewer(palette = "Dark2") +
             labs(color = "TMAO Tertile")
     )
 }
 
-# Loop Plot
+# Loop Plot to save
 nres <- length(resOTU)
 for (i in 1:nres) { 
-    temp_plot <- ggplot(ggData, aes(x = tmao_tertile, y = log(ggData[,i]))) +
+    temp_plot <- ggplot(ggData_F, aes(x = tmao_tertile, y = log(ggData_F[,i]))) +
             geom_boxplot(aes(color=tmao_tertile)) +
             geom_point() +
             theme_minimal() +
-            ylab(paste0("Log of", colnames(ggData[i]))) +
+            ylab(paste0("Log of", colnames(ggData_F[i]))) +
             xlab("TMAO Tertile") +
             scale_color_brewer(palette = "Dark2") +
             labs(color = "TMAO Tertile")
