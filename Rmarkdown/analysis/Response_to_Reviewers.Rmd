@@ -1,0 +1,380 @@
+---
+title: "Response to Reviewers"
+author: "Kristen James"
+date: "3/7/2022"
+output: html_document
+---
+
+This markdown was created in response to the Reviewer's comments during the peer-review process of our manuscript submitted to Nutrients. The workflow is borrowed in large part from "Characteristics_Diet_CardiometabolicRisk_211111.Rmd" with subtle changes.
+
+Load libraries
+
+```{r Libraries, warning=FALSE, message=FALSE}
+library(plyr)
+library(tableone)
+```
+
+Load data 
+
+```{r Load data}
+phen <- readRDS("../../data/processed/phenotype/Phenotypes_211108.rds")
+
+# Complete TMAO data only
+phen <- phen[complete.cases(phen$tmao == TRUE),]
+
+# Get rid of NA ethnicity category
+phen$ethnicity <- droplevels(phen$ethnicity)
+
+# Factor and recode sex
+phen$sex <- as.factor(phen$sex)
+phen$sex <- plyr::revalue(phen$sex, c("1" = "Male", "2" = "Female"))
+
+# Make TMAO log variable
+phen$tmao_log <- log(phen$tmao)
+
+```
+
+# Reviewer 1
+
+Provide the number of participants in each age-sex-BMI bin to answer Reviewer 1's comment about statistical power. 
+
+```{r}
+table(phen$bin_number)
+```
+
+Reviewer 1 didn't understand that the relationship between TMAO and age differed by sex. We will make it more clear by stating the restults of the statistical test. 
+
+```{r sex*age interaction}
+summary(lm(tmao_log ~ sex*age  + cystatinc_bd1, phen))
+```
+
+# Reviewer 2
+
+## Fiber Comment
+Reviewer 2 asked why we did not include fiber in the analysis. We will add total fiber intake from foods and supplements (fibe_tnfs) to our analysis.
+
+First, lets set up the dataframe. This code is borrowed from "Characteristics_Diet_CardiometabolicRisk_211111.Rmd".
+
+```{r Load data and preprocess}
+phen <- readRDS("../../data/processed/phenotype/Phenotypes_211108.rds")
+
+# Complete TMAO data only
+phen <- phen[complete.cases(phen$tmao == TRUE),]
+
+# Get rid of NA ethnicity category
+phen$ethnicity <- droplevels(phen$ethnicity)
+
+# Factor and recode sex
+phen$sex <- as.factor(phen$sex)
+phen$sex <- plyr::revalue(phen$sex, c("1" = "Male", "2" = "Female"))
+
+# Make TMAO log variable
+phen$tmao_log <- log(phen$tmao)
+
+# Convert crp units
+phen$crp_bd1.mgdL <- phen$crp_bd1 * 0.0001
+```
+
+Create quantile and tertile classifiers. Transform data to comply to normality (Shapiro-Wilk test W statistic > 0.95).
+
+```{r Quantile and Tertile TMAO}
+# Quantile
+tmao_quantile <- quantile(phen$tmao)
+phen$tmao_quantile <- ifelse(phen$tmao <= tmao_quantile[2], "Quantile1",
+                             ifelse(phen$tmao > tmao_quantile[2] & phen$tmao <= tmao_quantile[3], "Quantile2",
+                                   ifelse(phen$tmao > tmao_quantile[3] & phen$tmao <= tmao_quantile[4], "Quantile3", "Quantile4")))
+
+# Check it
+table(phen$tmao_quantile)
+phen$tmao_quantile <- as.factor(phen$tmao_quantile)
+str(phen$tmao_quantile)
+
+# Tertile
+tmao_tertile <- quantile(phen$tmao, c(0:3/3))
+phen$tmao_tertile <- ifelse(phen$tmao <= tmao_tertile[2], "Tertile1",
+                             ifelse(phen$tmao > tmao_tertile[2] & phen$tmao <= tmao_tertile[3], "Tertile2", "Tertile3"))
+# Factor it
+phen$tmao_tertile <- factor(phen$tmao_tertile)
+table(phen$tmao_tertile)
+
+# Print tertiles for manuscript
+tmao_tertile
+
+# Checked all variables for normality via shapiro.test() in console. TG, and glc ere the only ones that didn't pass.
+phen$glc_bd1_ln <- log(phen$glc_bd1)
+phen$tg_bd1_ln <- log(phen$tg_bd1)
+phen$crp_bd1_ln <- log(phen$crp_bd1)
+phen$tnfa_bd1_ln <- log(phen$tnfa_bd1)
+phen$il6_bd1_ln <- log(phen$il6_bd1)
+phen$insulin_bd1_ln <- log(phen$insulin_bd1)
+```
+
+Load the diet data. 
+
+```{r Load ASA24 averaged data}
+food <- readRDS(file = "../../data/processed/asa24/ASA24_meanIntake_withTransformations_211111.rds")
+
+# Combine food with phenotype data
+full <- merge(phen, food, by = 0)
+row.names(full) <- full[,"Row.names"]
+full <- subset(full, select = -c(Row.names))
+
+# Make ASA24 choline log variable
+full$choln_tnfs_log <- log(full$choln_tnfs)
+
+# Make ASA24 fiber log variable
+shapiro.test(log(full$fibe_tnfs))
+full$fibe_tnfs_log <- log(full$fibe_tnfs)
+```
+
+Make a list of foods and covariate variables to keep. Add fiber this time!
+
+```{r Foods to keep, results='hide'}
+transformed_keep_tbl <- c("sex", 
+#"sex_numeric",
+"kcal_tnfs", 
+"age", 
+"cystatinc_bd1", 
+"ethnicity",
+"tmao", 
+"tmao_log", 
+#"TMAO.0",
+#"TMAO.30",
+#"TMAO.180",
+#"TMAO.360",
+#"lnTMAO.0",
+#"lnTMAO.30",
+#"lnTMAO.180",
+#"lnTMAO.360",
+#"TMAO_0_30",
+#"TMAO_0_180",
+#"TMAO_0_360",
+#"Ind.SO4",
+#"p.Cresol.SO4",
+#"TMAO_quart_num",
+#"T.pf_mps_totals_sqrRt",
+"T.pf_meat_totals_sqrRt",
+"T.pf_curedmeat_totals_sqrRt",
+"T.pf_poult_totals_sqrRt",
+"T.pf_seafd_hi_totals_Binary",
+"T.pf_seafd_low_totals_Binary",
+"T.pf_eggs_totals_sqrRt",
+"T.pf_nutsds_totals_sqrRt",
+"T.pf_legumes_totals_sqrRt",
+"T.pf_total_totals_natLog",
+#"T.pf_soy_totals_Binary",
+"T.v_drkgr_totals_sqrRt",
+"T.v_redor_total_totals_sqrRt",
+#"T.v_redor_tomato_totals_sqrRt",
+#"T.v_redor_other_totals_sqrRt",
+"T.v_starchy_total_totals_sqrRt",
+#"T.v_starchy_potato_totals_sqrRt",
+#"T.v_starchy_other_totals_sqrRt",
+"T.v_other_totals_sqrRt",
+"T.v_total_totals_sqrRt",
+#"T.v_legumes_total_sqrRt",
+"T.g_whole_totals_sqrRt",
+"T.g_refined_totals_sqrRt",
+"g_total_totals",
+"T.d_total_totals_sqrRt",
+"T.d_milk_totals_sqrRt",
+"T.d_cheese_totals_sqrRt",
+"T.d_yogurt_totals_Binary",
+"choln_tnfs_log",
+"hei_asa24_totalscore",
+"fibe_tnfs_log"
+)
+```
+
+Now run the multiple linear regression. Note, we will not include ethnicity in these regressions because although TMAO levels significantly differ between ethnic groups, there was no relationship between TMAO and ethnicity. Additionally, diet patterns differ by ethnicity so we could be over adjusting.
+
+```{r TMAO ~ food - LCMS BD1 - lm 356 ppl, results='hide'}
+# Make a smaller df from master (the old data)
+full_sub <- full[, colnames(full) %in% transformed_keep_tbl]
+food <- subset(full_sub, select = -c(sex, kcal_tnfs, age, cystatinc_bd1, ethnicity, tmao, tmao_log))
+n <- ncol(food)
+
+# LCMS method
+# Run linear model
+my_lm <- lapply(1:n, function(x) lm(tmao_log ~ food[,x] + sex*age + cystatinc_bd1 + kcal_tnfs, full_sub )) # include kcal
+
+# Organize results
+my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
+my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [food row, estimate] corresponds to food B 
+my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [food row, Std.Error] corresponds to food Std. Error 
+my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [food row, T value] corresponds to food t value
+my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [food row, P] corresponds to food P value
+my_lm356_lcms <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
+colnames(my_lm356_lcms) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
+row.names(my_lm356_lcms) <- colnames(food)
+res_food <- as.data.frame(my_lm356_lcms)
+
+# BH correction
+res_food$p.adj <- stats::p.adjust(res_food$P, method = "BH", n = n) 
+```
+
+Save with the extension "_withFiber"
+
+```{r save food linear regression table}
+# Save table
+write.csv(res_food, "../../Outputs/tables/Diet/MultipleLinReg_TMAO_LCMS_n356_ASA24_withFiber.csv")
+```
+
+We also need to add fiber to our food by TMAO tertile table. 
+
+```{r Food Intake by TMAO tertile}
+# TMAO table by age bin - females
+factorVars <- c("age_cat", "tmao_quantile")
+vars <- c("pf_meat_totals", 
+          "pf_curedmeat_totals",
+          "pf_poult_totals",
+          "pf_seafd_hi_totals",
+          "pf_seafd_low_totals",
+          "pf_eggs_totals",
+          "pf_nutsds_totals",
+          "pf_legumes_totals",
+          "pf_total_totals",
+          #"pf_soy_totals_Binary",
+          "v_drkgr_totals",
+          "v_redor_total_totals",
+          #"v_redor_tomato_totals",
+          #"v_redor_other_totals",
+          "v_starchy_total_totals",
+          #"v_starchy_potato_totals",
+          #"v_starchy_other_totals",
+          "v_other_totals",
+          "v_total_totals",
+          #"v_legumes_total",
+          "g_whole_totals",
+          "g_refined_totals",
+          "g_total_totals",
+          "d_total_totals",
+          "d_milk_totals",
+          "d_cheese_totals",
+          "d_yogurt_totals",
+          "hei_asa24_totalscore",
+          "choln_tnfs",
+          "fibe_tnfs", # fiber added!
+          "age",
+          "ethnicity" ,
+          "bmi_final",
+          "tmao",
+          "choline",
+          "betaine",
+          "carnitine")
+table_food.ft <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = full[full$sex == "Female",],
+                                    factorVars = factorVars)
+table_food.ft
+
+# TMAO table by age bin - males
+table_food.mt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = full[full$sex == "Male",],
+                                    factorVars = factorVars)
+table_food.mt
+
+# TMAO table by sex
+table_food.allt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = full,
+                                    factorVars = factorVars)
+table_food.allt
+
+# Do BH correction
+food_allt_ContTable <- attr(table_food.allt$ContTable, "pValues")
+n <- length(food_allt_ContTable$pNormal)
+# BH correction
+food_allt_ContTable$padj <- stats::p.adjust(food_allt_ContTable$pNormal, method = "BH", n = n) 
+food_allt_ContTable
+```
+
+Save with the "_withFiber" extension.
+
+```{r Save food tertile tables}
+table_save.ft <- print(table_food.ft, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.ft, file = "../../Outputs/tables/ParticipantChar/Food_Female_byTMAOTertile_withFiber.csv")
+
+table_save.mt <- print(table_food.mt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.mt, file = "../../Outputs/tables/ParticipantChar/Food_Male_byTMAOTertile_withFiber.csv")
+
+table_save.allt <- print(table_food.allt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.allt, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOTertile_withFiber.csv")
+
+write.csv(food_allt_ContTable, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOTertile_PadjTable_withFiber.csv")
+```
+
+Reviewer 2 asked us to clarify what transformations were used in the endothelial analysis. Ultimately, we used AI in Table 1 and  AI75 in the linear regression analysis. This was because when we use AI75 in the descriptive table, the mean values are negative and positive, which is confusing/not intuitive. The following chunk demonstrates this point. 
+
+```{r Participant characterisitics by TMAO tertile}
+# TMAO table by tmao_tertile - females
+factorVars <- c("age_cat", "tmao_tertile")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.ft <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = phen[phen$sex == "Female",],
+                                    factorVars = factorVars)
+table_tmao.ft
+
+# TMAO table by tmao_tertile - males
+factorVars <- c("age_cat", "tmao_tertile")
+vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.mt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = phen[phen$sex == "Male",], # note 6103 and 7098 have high il6
+                                    factorVars = factorVars)
+table_tmao.mt
+
+# TMAO table by tmao_tertile - all, add sex
+factorVars <- c("tmao_tertile", "sex")
+vars <- c("age", "sex", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
+table_tmao.allt <- CreateTableOne(vars = vars,
+                                    strata = "tmao_tertile",
+                                    data = phen,
+                                    factorVars = factorVars)
+table_tmao.allt
+
+# Do BH correction for continuous variables
+allt_ContTable <- attr(table_tmao.allt$ContTable, "pValues")
+n <- length(allt_ContTable$pNormal)
+# BH correction
+allt_ContTable$padj <- stats::p.adjust(allt_ContTable$pNormal, method = "BH", n = n) 
+allt_ContTable
+
+# Do BH correction for categorical variables
+allt_CatTable <- attr(table_tmao.allt$CatTable, "pValues")
+n <- 23
+# BH correction
+allt_CatTable$padj <- stats::p.adjust(allt_CatTable$pApprox, method = "BH", n = n) 
+allt_CatTable
+```
+
+Save with "_al75" extension; however, we did not use these tables (we used the AI version originally created).
+
+```{r Save characteristic tertile tables}
+table_save.ft <- print(table_tmao.ft, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.ft, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byTMAOTertile_al75.csv")
+
+table_save.mt <- print(table_tmao.mt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.mt, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byTMAOTertile_al75.csv")
+
+table_save.allt <- print(table_tmao.allt, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(table_save.allt, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOTertile_al75.csv")
+
+# BH corrections for the all tertile table
+write.csv(allt_ContTable, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOTertile_Padj_al75.csv")
+```
+
+Do some individuals have undiagnosed hyperglycemia or hyperlipidemia? Yes
+
+```{r undiagnosed metabolic disease}
+summary(phen$glc_bd1)
+summary(phen$tg_bd1)
+summary(phen$chol_bd1)
+
+hist(phen$glc_bd1, breaks = 40)
+hist(phen$tg_bd1, breaks = 40)
+hist(phen$chol_bd1, breaks = 40)
+```
+
