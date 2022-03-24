@@ -44,7 +44,7 @@ Provide the number of participants in each age-sex-BMI bin to answer Reviewer 1'
 table(phen$bin_number)
 ```
 
-Reviewer 1 didn't understand that the relationship between TMAO and age differed by sex. We will make it more clear by stating the restults of the statistical test. 
+Reviewer 1 didn't understand that the relationship between TMAO and age differed by sex. We will make it more clear by stating the results of the statistical test. 
 
 ```{r sex*age interaction}
 summary(lm(tmao_log ~ sex*age  + cystatinc_bd1, phen))
@@ -56,20 +56,7 @@ Demonstrate the sex* age interaction in a visual plot for the supplement.
 colnames(phen)
 sd <- sd(phen$tmao_log)
 
-# too messy, point of interaction not obvious
-ggplot(phen, aes(x = age, y = tmao_log, group = sex, color = sex)) +
-  geom_line() +
-  geom_point() +
-  geom_errorbar(aes(ymin=tmao_log - sd, ymax=tmao_log+sd),
-                width = .2,
-                position = position_dodge(0.05)) +
-  theme_minimal() +
-  ylab("Log of TMAO (uM)") +
-  xlab("Age (years)") +
-  scale_color_brewer(palette = "Dark2") +
-  labs(color = "Sex")
-
-# try a simplified version - this is better
+# Plot
 p <- ggplot(phen, aes(x = age, y = tmao_log, group = sex, color = sex)) +
   geom_point() +
   geom_smooth(method = lm) +
