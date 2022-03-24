@@ -22,9 +22,10 @@ output: html_document
 
 **Outputs:** Outputs include: 
 
-1) 
+1) Descriptive tables describing participants
+2) Diet-TMAO analysis results
+3) CVD-TMAO analysis results
 
-**Sources:**
 
 ```{r Libraries, warning=FALSE, message=FALSE}
 library(plyr)
@@ -156,51 +157,8 @@ phen$il6_bd1_ln <- log(phen$il6_bd1)
 phen$insulin_bd1_ln <- log(phen$insulin_bd1)
 ```
 
-TMAO Quantile Tables
 
-```{r Participant characterisitics by TMAO quantile}
-# TMAO table by age bin - females
-factorVars <- c("age_cat", "tmao_quantile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
-table_tmao.fq <- CreateTableOne(vars = vars,
-                                    strata = "tmao_quantile",
-                                    data = phen[phen$sex == "Female",],
-                                    factorVars = factorVars)
-table_tmao.fq
-
-# TMAO table by age bin - males
-factorVars <- c("age_cat", "tmao_quantile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
-table_tmao.mq <- CreateTableOne(vars = vars,
-                                    strata = "tmao_quantile",
-                                    data = phen[phen$sex == "Male",],
-                                    factorVars = factorVars)
-table_tmao.mq
-
-# TMAO table by sex
-factorVars <- c("tmao_quantile")
-vars <- c("age", "ethnicity" , "bmi_final", "waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1", "glc_bd1", "insulin_bd1", "tnfa_bd1", "il6_bd1", "crp_bd1.mgdL", "cystatinc_bd1", "tmao", "choline", "betaine", "carnitine")
-table_tmao.allq <- CreateTableOne(vars = vars,
-                                    strata = "tmao_quantile",
-                                    data = phen,
-                                    factorVars = factorVars)
-table_tmao.allq
-```
-
-Save 
-
-```{r Save characteristic quantile tables}
-table_save.fq <- print(table_tmao.fq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Female_byTMAOQuantile_211203.csv")
-
-table_save.mq <- print(table_tmao.mq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Characteristics_Male_byTMAOQuantile_211203.csv")
-
-table_save.allq <- print(table_tmao.allq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Characteristics_All_byTMAOQuantile_211203.csv")
-```
-
-Make similar tables but for TMAO tertile 
+Create TMAO tertile descriptive table
 
 ```{r Participant characterisitics by TMAO tertile}
 # TMAO table by tmao_tertile - females
@@ -413,19 +371,6 @@ full <- subset(full, select = -c(Row.names))
 full$choln_tnfs_log <- log(full$choln_tnfs)
 ```
 
-Load the Dietary Inflammation Index Score
-
-```{r Dietary Inflammation Index}
-# Load the diet scores from Levi and grep for the dietary inflammation index scores only
-inflm <- read.csv("../../data/raw/from_LeviEvans/HEI scores_for LE_6142021.csv", row.names = 1)
-inflm <- inflm[,grep("dii", colnames(inflm))]
-
-# Combine with the full data from above
-full <- merge(full, inflm, by = 0)
-row.names(full) <- full[,"Row.names"]
-full <- subset(full, select = -c(Row.names))
-```
-
 Make a list of foods and covariate variables to keep.
 
 ```{r Foods to keep, results='hide'}
@@ -518,267 +463,6 @@ Save
 write.csv(res_food, "../../Outputs/tables/Diet/MultipleLinReg_TMAO_LCMS_n356_ASA24.csv")
 ```
 
-Check the relationship between the dietary inflammation index and fasting plasma TMAO. 
-
-```{r TMAO ~ dii - LCMS BD1 - lm 356 ppl, results='hide'}
-transformed_keep_tbl2 <- c("sex", 
-#"sex_numeric",
-"kcal_tnfs", 
-"age", 
-"cystatinc_bd1", 
-"ethnicity",
-"tmao", 
-"tmao_log", 
-"dii_alcohol",
-"dii_b12",
-"dii_b6",
-"dii_betacarotene",
-"dii_caffeine",
-"dii_carb",
-"dii_chol",
-"dii_kcal",
-"dii_totalfat",
-"dii_fiber",
-"dii_folicacid",
-"dii_iron",
-"dii_magnesium",
-"dii_mufa",
-"dii_niacin",
-"dii_omega3",
-"dii_omega6",
-"dii_protein",
-"dii_pufa",
-"dii_riboflavin",
-"dii_satfat",
-"dii_selenium",
-"dii_thiamin",
-"dii_transfat",
-"dii_vita",
-"dii_vitc",
-"dii_vitd",
-"dii_vite",
-"dii_zinc",
-"dii_tea" ,
-"dii_flav3ol",
-"dii_flavone",
-"dii_flavonol",
-"dii_flavonon",
-"dii_anthocy",     
-"dii_isoflav",
-"dii_total_score")
-
-# Make a smaller df from master (the old data)
-full_sub <- full[, colnames(full) %in% transformed_keep_tbl2]
-dii <- subset(full_sub, select = -c(sex, kcal_tnfs, age, cystatinc_bd1, ethnicity, tmao, tmao_log))
-n <- ncol(dii)
-
-# LCMS method
-# Run linear model
-my_lm <- lapply(1:n, function(x) lm(tmao_log ~ dii[,x] + sex*age + cystatinc_bd1 + kcal_tnfs, full_sub))
-
-# Organize results
-my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
-my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [food row, estimate] corresponds to food B 
-my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [food row, Std.Error] corresponds to food Std. Error 
-my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [food row, T value] corresponds to food t value
-my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [food row, P] corresponds to food P value
-my_lm356_lcms <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
-colnames(my_lm356_lcms) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
-row.names(my_lm356_lcms) <- colnames(dii)
-res_dii <- as.data.frame(my_lm356_lcms)
-
-# BH correction
-res_dii$p.adj <- stats::p.adjust(res_dii$P, method = "BH", n = n) 
-```
-
-There are no significant relationships after adjusting for multiple corrections in the full cohort. Prior to multiple testing correction, there is a significant finding with Vitamin C but that is not clearly supported by the literature.
-
-Save for your records.
-
-```{r save food linear regression table}
-# Save table
-write.csv(res_dii, "../../Outputs/tables/Diet/MultipleLinReg_TMAO_LCMS_n356_DII.csv")
-```
-
-Double check by sex
-
-```{r TMAO ~ dii - LCMS BD1 male and female - lm 356 ppl, results='hide'}
-transformed_keep_tbl2 <- c("sex", 
-#"sex_numeric",
-"kcal_tnfs", 
-"age", 
-"cystatinc_bd1", 
-"ethnicity",
-"tmao", 
-"tmao_log", 
-"dii_alcohol",
-"dii_b12",
-"dii_b6",
-"dii_betacarotene",
-"dii_caffeine",
-"dii_carb",
-"dii_chol",
-"dii_kcal",
-"dii_totalfat",
-"dii_fiber",
-"dii_folicacid",
-"dii_iron",
-"dii_magnesium",
-"dii_mufa",
-"dii_niacin",
-"dii_omega3",
-"dii_omega6",
-"dii_protein",
-"dii_pufa",
-"dii_riboflavin",
-"dii_satfat",
-"dii_selenium",
-"dii_thiamin",
-"dii_transfat",
-"dii_vita",
-"dii_vitc",
-"dii_vitd",
-"dii_vite",
-"dii_zinc",
-"dii_tea" ,
-"dii_flav3ol",
-"dii_flavone",
-"dii_flavonol",
-"dii_flavonon",
-"dii_anthocy",     
-"dii_isoflav",
-"dii_total_score")
-
-# Investigate by sex
-#~~~~~~~~~~~~~
-# FEMALES 
-#~~~~~~~~~~~~~
-# Make a smaller df from master (the old data)
-full_sub_F <- full[, colnames(full) %in% transformed_keep_tbl2]
-full_sub_F <- full_sub_F[full_sub_F$sex == "Female",]
-dii_F <- subset(full_sub_F, select = -c(sex, kcal_tnfs, age, cystatinc_bd1, ethnicity, tmao, tmao_log))
-n <- ncol(dii_F)
-# LCMS method
-# Run linear model
-my_lm <- lapply(1:n, function(x) lm(tmao_log ~ dii_F[,x] + age + cystatinc_bd1 + kcal_tnfs, full_sub_F ))
-
-# Organize results
-my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
-my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [food row, estimate] corresponds to food B 
-my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [food row, Std.Error] corresponds to food Std. Error 
-my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [food row, T value] corresponds to food t value
-my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [food row, P] corresponds to food P value
-my_lm356_lcms <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
-colnames(my_lm356_lcms) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
-row.names(my_lm356_lcms) <- colnames(dii_F)
-res_dii_F <- as.data.frame(my_lm356_lcms)
-
-# BH correction
-res_dii_F$p.adj <- stats::p.adjust(res_dii_F$P, method = "BH", n = n) 
-
-#~~~~~~~~~~~~~
-# MALES 
-#~~~~~~~~~~~~~
-# Make a smaller df from master (the old data)
-full_sub_M <- full[, colnames(full) %in% transformed_keep_tbl2]
-full_sub_M <- full_sub_M[full_sub_M$sex == "Male",]
-dii_M <- subset(full_sub_M, select = -c(sex, kcal_tnfs, age, cystatinc_bd1, ethnicity, tmao, tmao_log))
-n <- ncol(dii_M)
-# LCMS method
-# Run linear model
-my_lm <- lapply(1:n, function(x) lm(tmao_log ~ dii_M[,x] + age + cystatinc_bd1 + kcal_tnfs, full_sub_M ))
-
-# Organize results
-my_lm2 <- sapply(my_lm, function(x){summary(x)$adj.r.squared})
-my_lm2.5 <- sapply(my_lm, function(x){summary(x)$coefficients[2,1]}) # [food row, estimate] corresponds to food B 
-my_lm2.6 <- sapply(my_lm, function(x){summary(x)$coefficients[2,2]}) # [food row, Std.Error] corresponds to food Std. Error 
-my_lm2.7 <- sapply(my_lm, function(x){summary(x)$coefficients[2,3]}) # [food row, T value] corresponds to food t value
-my_lm3 <- sapply(my_lm, function(x){summary(x)$coefficients[2,4]}) # [food row, P] corresponds to food P value
-my_lm356_lcms <- cbind(my_lm2, my_lm2.5, my_lm2.6, my_lm2.7, my_lm3)
-colnames(my_lm356_lcms) <- c("adj.r.squared", "estimate", "Std.Error", "T.value","P")
-row.names(my_lm356_lcms) <- colnames(dii_M)
-res_dii_M <- as.data.frame(my_lm356_lcms)
-
-# BH correction
-res_dii_M$p.adj <- stats::p.adjust(res_dii_M$P, method = "BH", n = n) 
-```
-
-Still no significant results after BH correction. Prior to BH correction, there is a suggested relationship with folic acid and TMAO in males. 
-
-Make TMAO food intake by quantile table
-
-```{r Food Intake by TMAO quantile}
-# TMAO table by age bin - females
-factorVars <- c("age_cat", "tmao_quantile")
-vars <- c("pf_meat_totals", 
-          "pf_curedmeat_totals",
-          "pf_poult_totals",
-          "pf_seafd_hi_totals",
-          "pf_seafd_low_totals",
-          "pf_eggs_totals",
-          "pf_nutsds_totals",
-          "pf_legumes_totals",
-          "pf_total_totals",
-          #"pf_soy_totals_Binary",
-          "v_drkgr_totals",
-          "v_redor_total_totals",
-          #"v_redor_tomato_totals",
-          #"v_redor_other_totals",
-          "v_starchy_total_totals",
-          #"v_starchy_potato_totals",
-          #"v_starchy_other_totals",
-          "v_other_totals",
-          "v_total_totals",
-          #"v_legumes_total",
-          "g_whole_totals",
-          "g_refined_totals",
-          "g_total_totals",
-          "d_total_totals",
-          "d_milk_totals",
-          "d_cheese_totals",
-          "d_yogurt_totals",
-          "hei_asa24_totalscore",
-          "hei_asa24_totalveg",
-          "hei_asa24_sfat",
-          "choln_tnfs",
-          "age",
-          "ethnicity" ,
-          "bmi_final",
-          "tmao",
-          "choline",
-          "betaine",
-          "carnitine")
-table_food.fq <- CreateTableOne(vars = vars,
-                                    strata = "tmao_quantile",
-                                    data = full[full$sex == "Female",],
-                                    factorVars = factorVars)
-table_food.fq
-
-# TMAO table by age bin - males
-table_food.mq <- CreateTableOne(vars = vars,
-                                    strata = "tmao_quantile",
-                                    data = full[full$sex == "Male",],
-                                    factorVars = factorVars)
-table_food.mq
-
-# TMAO table by sex
-table_food.allq <- CreateTableOne(vars = vars,
-                                    strata = "tmao_quantile",
-                                    data = full,
-                                    factorVars = factorVars)
-table_food.allq
-```
-
-```{r Save food quantile tables}
-table_save.fq <- print(table_food.fq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.fq, file = "../../Outputs/tables/ParticipantChar/Food_Female_byTMAOQuantile.csv")
-
-table_save.mq <- print(table_food.mq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.mq, file = "../../Outputs/tables/ParticipantChar/Food_Male_byTMAOQuantile.csv")
-
-table_save.allq <- print(table_food.allq, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(table_save.allq, file = "../../Outputs/tables/ParticipantChar/Food_All_byTMAOQuantile.csv")
-```
 
 TMAO tertile 
 Make TMAO food intake by tertile table
@@ -960,24 +644,7 @@ for(i in 11:ncol(full_sub_na2)){
 }
 
 ```
-```
 
-
-
-
-
-
-
-"waistavg_cm", "sysbpavgv2", "diabpavgv2", "endo_rhi", "endo_al75", "hdl_bd1", "ldl_bd1", "chol_bd1", "tg_bd1_ln", "glc_bd1_ln","tnfa_bd1_ln", "il6_bd1_ln", "crp_bd1_ln",
-
-
-BS section below...
-```{r}
-full$low_mps_meat <- ifelse(full$pf_mps_total_totals <= median(full$pf_mps_total_totals), "low", "high")
-full$low_mps_meat <- ifelse(full$pf_mps_total_totals <= 9.091, "low", "high")
-summary(lm(glc_bd1_ln ~  tmao_log + sex*age + cystatinc_bd1, full[full$low_mps_meat == "high",]))
-summary(lm(glc_bd1_ln ~  tmao_log + sex*age + cystatinc_bd1, full[full$low_mps_meat == "high",]))
-```
 
 
 
