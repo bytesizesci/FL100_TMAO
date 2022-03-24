@@ -2,7 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
+data
 data/raw
 data/processed
+Outputs
 Rmarkdown/preprocessing/Q2Rtemp
 Reports
