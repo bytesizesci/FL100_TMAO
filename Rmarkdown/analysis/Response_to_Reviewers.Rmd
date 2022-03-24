@@ -12,6 +12,7 @@ Load libraries
 ```{r Libraries, warning=FALSE, message=FALSE}
 library(plyr)
 library(tableone)
+library(ggplot2)
 ```
 
 Load data 
@@ -35,6 +36,7 @@ phen$tmao_log <- log(phen$tmao)
 ```
 
 # Reviewer 1
+## Reviewer 1 - Response 1
 
 Provide the number of participants in each age-sex-BMI bin to answer Reviewer 1's comment about statistical power. 
 
@@ -47,6 +49,42 @@ Reviewer 1 didn't understand that the relationship between TMAO and age differed
 ```{r sex*age interaction}
 summary(lm(tmao_log ~ sex*age  + cystatinc_bd1, phen))
 ```
+
+## Reviewer 1 - Response 2
+Demonstrate the sex* age interaction in a visual plot for the supplement.
+```{r}
+colnames(phen)
+sd <- sd(phen$tmao_log)
+
+# too messy, point of interaction not obvious
+ggplot(phen, aes(x = age, y = tmao_log, group = sex, color = sex)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin=tmao_log - sd, ymax=tmao_log+sd),
+                width = .2,
+                position = position_dodge(0.05)) +
+  theme_minimal() +
+  ylab("Log of TMAO (uM)") +
+  xlab("Age (years)") +
+  scale_color_brewer(palette = "Dark2") +
+  labs(color = "Sex")
+
+# try a simplified version - this is better
+p <- ggplot(phen, aes(x = age, y = tmao_log, group = sex, color = sex)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  theme_minimal() +
+  ylab("Log of TMAO (uM)") +
+  xlab("Age (years)") +
+  scale_color_brewer(palette = "Dark2") +
+  labs(color = "Sex")
+  
+tiff(paste0("../../Outputs/plots/Sex_x_Age_Interaction.tiff"), width = 5, height = 4, units = 'in', res = 300)
+p
+dev.off()
+```
+
+
 
 # Reviewer 2
 
