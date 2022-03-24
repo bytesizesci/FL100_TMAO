@@ -123,7 +123,7 @@ saveRDS(dat_mean, file = "../../data/processed/asa24/ASA24_meanIntake_211111.rds
 saveRDS(dat_mean_noSup, file = "../../data/processed/asa24/ASA24_noSupplements_meanIntake_211111.rds")
 ```
 
-Many of these variables do not have a normal distribution. We will use this data to run parametric statistics so go ahead and transform key variables for future use. 
+Many of these variables do not have a normal distribution. They have been tested in an external program for the best transformation. We will use this data to run parametric statistics so go ahead and transform key variables for future use. 
 
 ```{r Transform}
 dat_mean2 <- dat_mean
@@ -162,31 +162,5 @@ Save
 ```{r Save averaged data with transformations}
 # rds
 saveRDS(dat_mean2, file = "../../data/processed/asa24/ASA24_meanIntake_withTransformations_211111.rds")
-```
-
-
-Little exploration below. Pay no mind.
-```{r}
-# Count number of subjects with 2 vs 3 recalls
-dat2_count <- dat2[complete.cases(dat2$lang_tnf),] # 384
-dat3_count <- dat3[complete.cases(dat3$lang_tnf),] # 378
-dat4_count <- dat4[complete.cases(dat4$lang_tnf),] # 347
-
-# What is the distribution of meat intake across the recalls?
-summary(dat2$pf_meat_totals)
-summary(dat3$pf_meat_totals)
-summary(dat4$pf_meat_totals)
-
-summary(dat2$pf_curedmeat_totals)
-summary(dat3$pf_curedmeat_totals)
-summary(dat4$pf_curedmeat_totals)
-
-t.test(dat2$pf_curedmeat_totals, dat4$pf_curedmeat_totals) # not different, good
-
-# List of TMAO subjects
-
-# List of subjects with at least 2 recalls and TMAO data
-
-# List of subjects with at least 3 recalls and TMAO data
 ```
 
